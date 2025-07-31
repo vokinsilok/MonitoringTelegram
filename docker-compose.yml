@@ -30,13 +30,15 @@ services:
     container_name: telegram_monitoring_backend
     environment:
       DB_USER: ${DB_USER:-postgres}
-      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      DB_PASS: ${DB_PASSWORD:-postgres}
       DB_HOST: postgres
       DB_PORT: 5432
       DB_NAME: ${DB_NAME:-telegram_monitoring}
       DEBUG: ${DEBUG:-true}
       HOST: 0.0.0.0
       PORT: 8000
+    volumes:
+      - ./migrations:/app/migrations
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     depends_on:
@@ -79,6 +81,8 @@ services:
       DB_HOST: postgres
       DB_PORT: 5432
       DB_NAME: ${DB_NAME:-telegram_monitoring}
+    volumes:
+      - ./migrations:/app/migrations
     command: ["alembic", "upgrade", "head"]
     depends_on:
       postgres:

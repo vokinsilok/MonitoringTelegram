@@ -7,6 +7,7 @@ from aiogram.enums import ParseMode
 from aiogram.filters import CommandStart
 from aiogram.types import Message, CallbackQuery
 from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.client.default import DefaultBotProperties
 
 # Импортируем конфигурацию из backend
 import sys
@@ -29,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 # Инициализируем бота и диспетчер с хранилищем состояний
 storage = MemoryStorage()
-bot = Bot(token=settings.BOT_TOKEN, parse_mode=ParseMode.HTML)
+bot = Bot(token=settings.BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 dp = Dispatcher(storage=storage)
 
 

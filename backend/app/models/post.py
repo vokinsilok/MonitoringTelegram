@@ -18,6 +18,9 @@ class Post(Base):
     """
     Модель поста из Telegram-канала.
     """
+    __tablename__ = "post"
+    
+    id = Column(Integer, primary_key=True, index=True)
     channel_id = Column(Integer, ForeignKey("channel.id"), nullable=False)
     message_id = Column(Integer, nullable=False)  # ID сообщения в Telegram
     text = Column(Text, nullable=True)  # Текст поста
@@ -37,6 +40,9 @@ class PostKeywordMatch(Base):
     """
     Модель для связи постов с ключевыми словами, которые были найдены в посте.
     """
+    __tablename__ = "post_keyword_match"
+    
+    id = Column(Integer, primary_key=True, index=True)
     post_id = Column(Integer, ForeignKey("post.id"), nullable=False)
     keyword_id = Column(Integer, ForeignKey("keyword.id"), nullable=False)
     
@@ -49,6 +55,9 @@ class PostProcessing(Base):
     """
     Модель для хранения информации об обработке поста оператором.
     """
+    __tablename__ = "post_processing"
+    
+    id = Column(Integer, primary_key=True, index=True)
     post_id = Column(Integer, ForeignKey("post.id"), nullable=False)
     operator_id = Column(Integer, ForeignKey("user.id"), nullable=False)
     status = Column(String, default=PostStatus.PENDING.value, nullable=False)

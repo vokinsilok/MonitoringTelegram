@@ -1,10 +1,11 @@
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Tuple, Set
 from datetime import datetime
 from sqlalchemy import select, update, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.app.models.post import PostProcessing, PostNotification
-from backend.app.schemas.post import PostProcessingCreate, PostNotificationCreate
+from backend.app.models.post import Post, PostProcessing, PostKeywordMatch
+from backend.app.models.keyword import Keyword
+from backend.app.schemas.post import PostProcessingCreate, PostNotificationCreate, PostNotification
 
 
 async def get_post_processings(
@@ -192,3 +193,59 @@ async def delete_similar_notifications(db: AsyncSession, post_id: int, exclude_u
     
     await db.commit()
     return count
+
+
+async def process_post_with_keywords(db: AsyncSession, post_id: int) -> Tuple[bool, Set[int], List[PostKeywordMatch]]:
+    """
+    Обработка поста с ключевыми словами.
+    
+    Проверяет содержимое поста на наличие ключевых слов и создает соответствующие записи PostKeywordMatch.
+    
+    Args:
+        db: Асинхронная сессия базы данных
+        post_id: ID поста для обработки
+        
+    Returns:
+        Tuple содержащий:
+        - bool: True, если найдены совпадения с ключевыми словами
+        - Set[int]: Набор ID ключевых слов, которые были найдены в посте
+        - List[PostKeywordMatch]: Список созданных объектов PostKeywordMatch
+    """
+    # Получаем пост из базы данных
+    post_query = select(Post).where(Post.id == post_id)
+    post_result = await db.execute(post_query)
+    post = post_result.scalar_one_or_none()
+    
+    if not post:
+        return False, set(), []
+    
+    # Получаем все активные ключевые слова
+    keywords_query = select(Keyword).where(Keyword.is_active == True)
+    keywords_result = await db.execute(keywords_query)
+    keywords = list(keywords_result.scalars().all())
+    
+    # Проверяем наличие ключевых слов в тексте поста
+    matched_keywords = []
+    matched_keyword_ids = set()
+    post_content = post.content.lower() if post.content else ""
+    
+    for keyword in keywords:
+        keyword_text = keyword.text.lower()
+        if keyword_text in post_content:
+            # Создаем запись о совпадении
+            match = PostKeywordMatch(
+                post_id=post.id,
+                keyword_id=keyword.id,
+                created_at=datetime.now()
+            )
+            db.add(match)
+            matched_keywords.append(match)
+            matched_keyword_ids.add(keyword.id)
+    
+    if matched_keywords:
+        await db.commit()
+        # Обновляем все объекты после коммита
+        for match in matched_keywords:
+            await db.refresh(match)
+    
+    return bool(matched_keywords), matched_keyword_ids, matched_keywords

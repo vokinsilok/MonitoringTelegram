@@ -10,6 +10,9 @@ class TelethonAccount(Base):
     Используется для мониторинга Telegram-каналов.
     Аккаунты не связаны с каналами напрямую, распределение происходит динамически.
     """
+    __tablename__ = "telethon_account"
+    
+    id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False, index=True)
     api_id = Column(String, nullable=False)
     api_hash = Column(String, nullable=False)

@@ -18,6 +18,9 @@ class Keyword(Base):
     """
     Модель ключевого слова или фразы для мониторинга.
     """
+    __tablename__ = "keyword"
+    
+    id = Column(Integer, primary_key=True, index=True)
     text = Column(String, nullable=False, index=True)
     type = Column(String, default=KeywordType.WORD.value, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
@@ -32,6 +35,9 @@ class KeywordProposal(Base):
     """
     Модель предложения добавления нового ключевого слова от оператора.
     """
+    __tablename__ = "keyword_proposal"
+    
+    id = Column(Integer, primary_key=True, index=True)
     keyword_id = Column(Integer, ForeignKey("keyword.id"), nullable=True)
     operator_id = Column(Integer, ForeignKey("user.id"), nullable=False)
     text = Column(String, nullable=False)

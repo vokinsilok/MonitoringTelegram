@@ -160,7 +160,7 @@ async def check_user_and_get_role(db: AsyncSession, telegram_id: int, username: 
     from backend.app.core.config import settings
     
     # Проверяем, является ли пользователь администратором
-    role = "admin" if telegram_id in settings.ADMIN_USER_IDS else "operator"
+    role = "admin" if telegram_id in settings.get_admin_ids() else "operator"
     
     # Создаем нового пользователя
     user_data = UserCreate(

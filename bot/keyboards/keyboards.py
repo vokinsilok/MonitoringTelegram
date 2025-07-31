@@ -89,8 +89,7 @@ def get_main_keyboard(is_admin: bool = False) -> ReplyKeyboardMarkup:
     Returns:
         ReplyKeyboardMarkup: Основная клавиатура
     """
-    keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
-    
+    # Создаем кнопки
     # Общие кнопки для всех пользователей
     report_button = KeyboardButton(text="📊 Отчет")
     
@@ -100,14 +99,23 @@ def get_main_keyboard(is_admin: bool = False) -> ReplyKeyboardMarkup:
         add_keyword_button = KeyboardButton(text="🔑 Добавить ключевое слово")
         manage_operators_button = KeyboardButton(text="👥 Управление операторами")
         
-        keyboard.row(add_channel_button, add_keyword_button)
-        keyboard.row(manage_operators_button, report_button)
+        # Создаем массив кнопок для клавиатуры
+        keyboard_buttons = [
+            [add_channel_button, add_keyword_button],
+            [manage_operators_button, report_button]
+        ]
     else:
         # Кнопки для оператора
         propose_channel_button = KeyboardButton(text="📢 Предложить канал")
         propose_keyword_button = KeyboardButton(text="🔍 Предложить ключевое слово")
         
-        keyboard.row(propose_channel_button, propose_keyword_button)
-        keyboard.row(report_button)
+        # Создаем массив кнопок для клавиатуры
+        keyboard_buttons = [
+            [propose_channel_button, propose_keyword_button],
+            [report_button]
+        ]
+    
+    # Создаем клавиатуру с обязательным полем keyboard
+    keyboard = ReplyKeyboardMarkup(keyboard=keyboard_buttons, resize_keyboard=True)
     
     return keyboard

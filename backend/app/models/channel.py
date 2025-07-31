@@ -19,6 +19,9 @@ class Channel(Base):
     """
     Модель Telegram-канала для мониторинга.
     """
+    __tablename__ = "channel"
+    
+    id = Column(Integer, primary_key=True, index=True)
     channel_id = Column(Integer, nullable=True)  # Telegram channel ID (может быть null для приватных каналов)
     username = Column(String, index=True, nullable=True)  # @username канала (может быть null)
     title = Column(String, nullable=False)  # Название канала
@@ -42,6 +45,9 @@ class ChannelProposal(Base):
     """
     Модель предложения добавления нового канала от оператора.
     """
+    __tablename__ = "channel_proposal"
+    
+    id = Column(Integer, primary_key=True, index=True)
     channel_id = Column(Integer, ForeignKey("channel.id"), nullable=True)
     operator_id = Column(Integer, ForeignKey("user.id"), nullable=False)
     status = Column(String, default="pending", nullable=False)  # pending, approved, rejected

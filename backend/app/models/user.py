@@ -18,6 +18,9 @@ class User(Base):
     Модель пользователя системы.
     Может быть администратором или оператором.
     """
+    __tablename__ = "user"
+    
+    id = Column(Integer, primary_key=True, index=True)
     telegram_id = Column(Integer, unique=True, index=True, nullable=False)
     username = Column(String, index=True)
     first_name = Column(String)

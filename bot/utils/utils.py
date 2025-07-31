@@ -20,7 +20,7 @@ def is_admin(user_id: int) -> bool:
     Returns:
         bool: True, если пользователь является администратором, иначе False
     """
-    return user_id in settings.ADMIN_USER_IDS
+    return user_id in settings.get_admin_ids()
 
 
 async def format_post_message(post: dict) -> str:

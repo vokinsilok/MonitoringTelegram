@@ -24,7 +24,7 @@ class NotificationService:
         try:
             # Если не указаны конкретные администраторы, отправляем всем
             if admin_ids is None:
-                admin_ids = settings.ADMIN_USER_IDS
+                admin_ids = settings.get_admin_ids()
                 
             if not admin_ids:
                 logger.warning("Нет администраторов для отправки уведомлений")

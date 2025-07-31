@@ -25,8 +25,10 @@ from backend.app.models.base import Base
 from backend.app.models.user import User
 from backend.app.models.channel import Channel, ChannelProposal
 from backend.app.models.keyword import Keyword, KeywordProposal
-from backend.app.models.post import Post, PostProcessing, PostNotification
-from backend.app.models.message_log import MessageLog, Report
+from backend.app.models.post import Post, PostProcessing
+from backend.app.models.message_log import MessageLog
+from backend.app.models.telethon_account import TelethonAccount
+
 
 target_metadata = Base.metadata
 

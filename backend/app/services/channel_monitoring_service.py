@@ -457,6 +457,24 @@ class ChannelMonitoringService:
             }
 
 
+    async def monitor_all_channels(self, db: AsyncSession):
+        """Мониторинг всех активных каналов"""
+        logger.info("Запуск мониторинга всех активных каналов")
+        try:
+            # Используем существующий метод monitor_channels для мониторинга всех каналов
+            result = await self.monitor_channels(db)
+            
+            # Логируем результат
+            if result.get("success", False):
+                logger.info(f"Мониторинг всех каналов успешно завершен. Обработано {result.get('total_channels', 0)} каналов, получено {result.get('new_posts', 0)} новых постов.")
+            else:
+                logger.error(f"Ошибка при мониторинге всех каналов: {result.get('message', 'Неизвестная ошибка')}")
+                
+            return result
+        except Exception as e:
+            logger.error(f"Ошибка при мониторинге всех каналов: {str(e)}")
+            return {"success": False, "message": f"Ошибка при мониторинге всех каналов: {str(e)}"}
+    
     async def start_periodic_monitoring(self, db: AsyncSession):
         """Запуск периодического мониторинга каналов"""
         logger.info("Запуск периодического мониторинга каналов")
