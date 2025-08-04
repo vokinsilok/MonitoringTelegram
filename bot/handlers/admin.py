@@ -74,30 +74,7 @@ async def process_confirmation(message: Message, state: FSMContext):
         
         # Получаем Telegram ID пользователя
         telegram_id = message.from_user.id
-        
-        try:
-            # Импортируем ApiClient для работы с API
-            from bot.utils.api_client import ApiClient
-            
-            # Добавляем канал через API
-            result = await ApiClient.add_channel(
-                telegram_id=telegram_id,
-                channel_url=channel_link
-            )
-            
-            # Отправляем уведомление операторам
-            from bot.utils.notification import send_operator_notification
-            await send_operator_notification(
-                f"Администратор {message.from_user.full_name} добавил новый канал для мониторинга:\n"
-                f"Канал: {channel_link}"
-            )
-            
-            await message.answer(f"Канал {channel_link} успешно добавлен для мониторинга!")
-        except Exception as e:
-            await message.answer(
-                f"Произошла ошибка при добавлении канала: {str(e)}\n"
-                f"Пожалуйста, попробуйте позже."
-            )
+
     else:
         await message.answer("Добавление канала отменено.")
     
@@ -177,32 +154,7 @@ async def process_keyword_confirmation(message: Message, state: FSMContext):
         
         # Получаем Telegram ID пользователя
         telegram_id = message.from_user.id
-        
-        try:
-            # Импортируем ApiClient для работы с API
-            from bot.utils.api_client import ApiClient
-            
-            # Добавляем ключевое слово через API
-            result = await ApiClient.add_keyword(
-                telegram_id=telegram_id,
-                keyword=keyword,
-                keyword_type=keyword_type
-            )
-            
-            # Отправляем уведомление операторам
-            from bot.utils.notification import send_operator_notification
-            await send_operator_notification(
-                f"Администратор {message.from_user.full_name} добавил новое ключевое слово для мониторинга:\n"
-                f"Ключевое слово: '{keyword}'\n"
-                f"Тип: {keyword_type}"
-            )
-            
-            await message.answer(f"Ключевое слово '{keyword}' типа '{keyword_type}' успешно добавлено для мониторинга!")
-        except Exception as e:
-            await message.answer(
-                f"Произошла ошибка при добавлении ключевого слова: {str(e)}\n"
-                f"Пожалуйста, попробуйте позже."
-            )
+
     else:
         await message.answer("Добавление ключевого слова отменено.")
     

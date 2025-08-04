@@ -99,34 +99,7 @@ async def process_channel_confirmation(message: Message, state: FSMContext):
         # Получаем Telegram ID пользователя
         telegram_id = message.from_user.id
         
-        try:
-            # Импортируем ApiClient для работы с API
-            from bot.utils.api_client import ApiClient
-            
-            # Сохраняем предложение канала через API
-            result = await ApiClient.create_channel_proposal(
-                telegram_id=telegram_id,
-                channel_url=channel_link,
-                comment=comment
-            )
-            
-            # Отправляем уведомление администраторам
-            from bot.utils.notification import send_admin_notification
-            await send_admin_notification(
-                f"Новое предложение канала от оператора {message.from_user.full_name} (ID: {telegram_id}):\n"
-                f"Канал: {channel_link}\n"
-                f"Комментарий: {comment}"
-            )
-            
-            await message.answer(
-                f"Ваше предложение канала {channel_link} отправлено администраторам на рассмотрение.\n"
-                f"Вы получите уведомление о результате."
-            )
-        except Exception as e:
-            await message.answer(
-                f"Произошла ошибка при отправке предложения канала: {str(e)}\n"
-                f"Пожалуйста, попробуйте позже или обратитесь к администратору."
-            )
+
     else:
         await message.answer("Предложение канала отменено.")
     
@@ -224,36 +197,7 @@ async def process_keyword_confirmation_proposal(message: Message, state: FSMCont
         # Получаем Telegram ID пользователя
         telegram_id = message.from_user.id
         
-        try:
-            # Импортируем ApiClient для работы с API
-            from bot.utils.api_client import ApiClient
-            
-            # Сохраняем предложение ключевого слова через API
-            result = await ApiClient.create_keyword_proposal(
-                telegram_id=telegram_id,
-                keyword=keyword,
-                keyword_type=keyword_type,
-                comment=comment
-            )
-            
-            # Отправляем уведомление администраторам
-            from bot.utils.notification import send_admin_notification
-            await send_admin_notification(
-                f"Новое предложение ключевого слова от оператора {message.from_user.full_name} (ID: {telegram_id}):\n"
-                f"Ключевое слово: {keyword}\n"
-                f"Тип: {keyword_type}\n"
-                f"Комментарий: {comment}"
-            )
-            
-            await message.answer(
-                f"Ваше предложение ключевого слова '{keyword}' отправлено администраторам на рассмотрение.\n"
-                f"Вы получите уведомление о результате."
-            )
-        except Exception as e:
-            await message.answer(
-                f"Произошла ошибка при отправке предложения ключевого слова: {str(e)}\n"
-                f"Пожалуйста, попробуйте позже или обратитесь к администратору."
-            )
+
     else:
         await message.answer("Предложение ключевого слова отменено.")
     
@@ -306,35 +250,7 @@ async def process_post_comment(message: Message, state: FSMContext):
     # Получаем Telegram ID пользователя
     telegram_id = message.from_user.id
     
-    try:
-        # Импортируем ApiClient для работы с API
-        from bot.utils.api_client import ApiClient
-        
-        # Сохраняем обработку поста через API
-        result = await ApiClient.process_post(
-            telegram_id=telegram_id,
-            post_id=post_id,
-            status=status,
-            comment=comment
-        )
-        
-        # Удаляем аналогичные сообщения у других операторов
-        # Импортируем функцию для отправки уведомлений операторам
-        from bot.utils.notification import send_operator_notification
-        
-        # Отправляем уведомление всем операторам о том, что пост обработан
-        status_text = "обработан" if status == "processed" else "отложен"
-        await send_operator_notification(
-            f"Пост ID:{post_id} был {status_text} оператором {message.from_user.full_name}.\n"
-            f"Комментарий: {comment}"
-        )
-        
-        await message.answer(f"Пост успешно {status_text} с комментарием: {comment}")
-    except Exception as e:
-        await message.answer(
-            f"Произошла ошибка при обработке поста: {str(e)}\n"
-            f"Пожалуйста, попробуйте позже или обратитесь к администратору."
-        )
+
     
     # Сбрасываем состояние
     await state.clear()
