@@ -12,8 +12,6 @@ def get_post_keyboard(post_id: str, post_url: str) -> InlineKeyboardMarkup:
     Returns:
         InlineKeyboardMarkup: Клавиатура с кнопками для поста
     """
-    keyboard = InlineKeyboardMarkup(row_width=2)
-    
     # Кнопка для перехода к первоисточнику
     source_button = InlineKeyboardButton(text="Перейти к первоисточнику", url=post_url)
     
@@ -34,10 +32,39 @@ def get_post_keyboard(post_id: str, post_url: str) -> InlineKeyboardMarkup:
         callback_data=f"postponed:{post_id}"
     )
     
-    # Добавляем кнопки в клавиатуру
-    keyboard.add(source_button)
-    keyboard.add(show_full_button)
-    keyboard.row(processed_button, postponed_button)
+    # Создаем клавиатуру с обязательным полем inline_keyboard
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [source_button],
+        [show_full_button],
+        [processed_button, postponed_button]
+    ])
+    
+    return keyboard
+
+
+def get_channel_proposal_keyboard(proposal_id: int) -> InlineKeyboardMarkup:
+    """
+    Создает клавиатуру для подтверждения или отклонения предложения канала.
+    
+    Args:
+        proposal_id: ID предложения канала
+    
+    Returns:
+        InlineKeyboardMarkup: Клавиатура с кнопками для подтверждения/отклонения
+    """
+    # Кнопки для подтверждения или отклонения предложения
+    approve_button = InlineKeyboardButton(
+        text="✅ Подтвердить", 
+        callback_data=f"approve_channel:{proposal_id}"
+    )
+    
+    reject_button = InlineKeyboardButton(
+        text="❌ Отклонить", 
+        callback_data=f"reject_channel:{proposal_id}"
+    )
+    
+    # Создаем клавиатуру с обязательным полем inline_keyboard
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[[approve_button, reject_button]])
     
     return keyboard
 
@@ -63,23 +90,24 @@ def get_main_keyboard(is_admin: bool = False, is_operator: bool = False) -> Repl
         add_keyword_button = KeyboardButton(text="🔑 Добавить ключевое слово")
         manage_operators_button = KeyboardButton(text="👥 Управление операторами")
         add_telethon_button = KeyboardButton(text="🔐 Добавить Telethon")
+        view_requests_button = KeyboardButton(text="📝 Обращения")
         
         # Создаем массив кнопок для клавиатуры
         keyboard_buttons = [
             [add_channel_button, add_keyword_button],
             [manage_operators_button, add_telethon_button],
-            [report_button]
+            [report_button, view_requests_button]
         ]
     elif is_operator:
         # Кнопки для оператора
         propose_channel_button = KeyboardButton(text="📢 Предложить канал")
         propose_keyword_button = KeyboardButton(text="🔍 Предложить ключевое слово")
-        view_requests_button = KeyboardButton(text="📝 Обращения")
+
         
         # Создаем массив кнопок для клавиатуры
         keyboard_buttons = [
             [propose_channel_button, propose_keyword_button],
-            [view_requests_button, report_button]
+            [report_button]
         ]
     else:
         # Кнопки для обычного пользователя (клиента)

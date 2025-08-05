@@ -1,7 +1,8 @@
 from pydantic import BaseModel
 from sqlalchemy import select, insert
+from typing import List
 
-from bot.models.user_model import User
+from bot.models.user_model import User, UserRole
 from bot.repo.base_repo import BaseRepository
 
 
@@ -18,3 +19,9 @@ class UserRepository(BaseRepository):
         else:
             new_user = await self.session.execute(insert(User).values(data.model_dump()).returning(User))
             return new_user.scalar()
+
+    async def get_admins(self) -> List[User]:
+        """Получить список всех администраторов"""
+        stmt = select(User).where(User.role == UserRole.ADMIN.value)
+        obj = await self.session.execute(stmt)
+        return obj.scalars().all()

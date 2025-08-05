@@ -8,6 +8,7 @@ from alembic import context
 from app.db.database import Base
 from app.core.config import settings
 from bot.models.user_model import User
+from bot.models.channel import Channel, ChannelProposal
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

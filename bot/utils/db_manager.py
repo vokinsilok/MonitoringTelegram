@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
 
+from bot.repo.chammel_repo import ChannelRepository
 from bot.repo.user_repo import UserRepository
 
 
@@ -11,6 +12,7 @@ class DBManager:
     async def __aenter__(self):
         self.session = self.session_factory()
         self.user = UserRepository(self.session)
+        self.channel = ChannelRepository(self.session)
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
