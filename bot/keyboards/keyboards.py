@@ -1,11 +1,13 @@
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton
 
 
-def get_post_keyboard(post_id: str, post_url: str) -> InlineKeyboardMarkup:
+def get_post_keyboard(pp_id: int, post_id: int, post_url: str) -> InlineKeyboardMarkup:
     """
-    Создает клавиатуру для сообщения с постом.
-    
+    Клавиатура для уведомления об отклике на пост.
+    callback_data содержит идентификатор записи PostProcessing для атомарной обработки.
+
     Args:
+        pp_id: ID записи PostProcessing
         post_id: ID поста в базе данных
         post_url: URL поста в Telegram
     
@@ -24,12 +26,12 @@ def get_post_keyboard(post_id: str, post_url: str) -> InlineKeyboardMarkup:
     # Кнопки для установки статуса
     processed_button = InlineKeyboardButton(
         text="Обработано", 
-        callback_data=f"processed:{post_id}"
+        callback_data=f"processed:{pp_id}"
     )
     
     postponed_button = InlineKeyboardButton(
         text="Отложено", 
-        callback_data=f"postponed:{post_id}"
+        callback_data=f"postponed:{pp_id}"
     )
     
     # Создаем клавиатуру с обязательным полем inline_keyboard

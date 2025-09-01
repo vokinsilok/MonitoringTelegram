@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 from typing import List, Optional
 
-from sqlalchemy import insert, select, and_
+from sqlalchemy import insert, select, and_, update
 from sqlalchemy.orm import selectinload
 
 from bot.models.post import Post, PostKeywordMatch, PostProcessing, PostStatus
@@ -60,3 +60,52 @@ class PostRepository(BaseRepository):
         )
         res = await self.session.execute(stmt)
         return res.unique().scalars().all()
+
+    async def get_processing(self, pp_id: int) -> Optional[PostProcessing]:
+        stmt = (
+            select(PostProcessing)
+            .where(PostProcessing.id == pp_id)
+            .options(selectinload(PostProcessing.post).selectinload(Post.channel))
+        )
+        res = await self.session.execute(stmt)
+        return res.scalar_one_or_none()
+
+    async def cas_update_processing_status(self, pp_id: int, new_status: str, comment: Optional[str] = None) -> Optional[PostProcessing]:
+        values = {"status": new_status, "processed_at": datetime.utcnow()}
+        if comment is not None:
+            values["comment"] = comment
+        stmt = (
+            update(PostProcessing)
+            .where(and_(PostProcessing.id == pp_id, PostProcessing.status == PostStatus.PENDING.value))
+            .values(**values)
+            .returning(PostProcessing)
+        )
+        res = await self.session.execute(stmt)
+        obj = res.scalar_one_or_none()
+        if obj:
+            await self.session.commit()
+        return obj
+
+    async def update_processing_notify_meta(self, pp_id: int, chat_id: int, message_id: int) -> None:
+        stmt = (
+            update(PostProcessing)
+            .where(PostProcessing.id == pp_id)
+            .values(notify_chat_id=chat_id, notify_message_id=message_id, notify_sent_at=datetime.utcnow())
+        )
+        await self.session.execute(stmt)
+        await self.session.commit()
+
+    async def get_siblings_processings(self, post_id: int, exclude_pp_id: Optional[int] = None) -> List[PostProcessing]:
+        stmt = select(PostProcessing).where(PostProcessing.post_id == post_id)
+        if exclude_pp_id is not None:
+            stmt = stmt.where(PostProcessing.id != exclude_pp_id)
+        res = await self.session.execute(stmt)
+        return res.scalars().all()
+
+    async def bulk_update_status_for_post(self, post_id: int, new_status: str, exclude_pp_id: Optional[int] = None) -> None:
+        stmt = update(PostProcessing).where(PostProcessing.post_id == post_id)
+        if exclude_pp_id is not None:
+            stmt = stmt.where(PostProcessing.id != exclude_pp_id)
+        stmt = stmt.values(status=new_status, processed_at=datetime.utcnow())
+        await self.session.execute(stmt)
+        await self.session.commit()

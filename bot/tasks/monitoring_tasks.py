@@ -7,6 +7,7 @@ from telethon.sessions import StringSession
 from telethon.errors import RPCError
 
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from bot.keyboards.keyboards import get_post_keyboard
 
 from app.core.config import settings
 from app.core.logging import main_logger
@@ -285,7 +286,6 @@ async def notify_loop(bot):
                 for pp in items:
                     if pp.id in notified:
                         continue
-                    # Загружаем пользователя, чтобы получить telegram_id
                     operator = await db.user.get_user_by_filter(id=pp.operator_id)
                     if not operator:
                         notified.add(pp.id)
@@ -293,23 +293,24 @@ async def notify_loop(bot):
                     post = pp.post
                     ch = post.channel if hasattr(post, "channel") else None
                     title = getattr(ch, "title", "Канал")
-                    user_display = operator.full_name if hasattr(operator, "full_name") else str(operator.telegram_id)
                     text = post.text or "(без текста)"
                     preview = (text[:400] + "…") if len(text) > 400 else text
                     url = post.url or ""
-                    msg = (
+                    msg_text = (
                         f"🔍 Найден пост по ключевым словам\n\n"
                         f"Канал: {title}\n"
                         f"Дата: {post.published_at:%Y-%m-%d %H:%M:%S}\n"
                         f"Ссылка: {url}\n\n"
                         f"Текст:\n{preview}"
                     )
+                    kb = get_post_keyboard(pp.id, post.id, url)
                     try:
-                        await bot.send_message(chat_id=operator.telegram_id, text=msg, disable_web_page_preview=True)
+                        sent = await bot.send_message(chat_id=operator.telegram_id, text=msg_text, reply_markup=kb, disable_web_page_preview=True)
+                        # Сохраняем метаданные отправленного уведомления
+                        await db.post.update_processing_notify_meta(pp.id, operator.telegram_id, sent.message_id)
                         notified.add(pp.id)
                     except Exception as e:
                         main_logger.error(f"notify send failed to {operator.telegram_id}: {e}")
-                        # Не помечаем как отправленное, попробуем позже
         except Exception as e:
             main_logger.error(f"notify_loop error: {e}")
         await asyncio.sleep(interval)

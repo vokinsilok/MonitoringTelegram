@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import List, Optional
 
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text, BigInteger
 from sqlalchemy.orm import relationship
 
 from app.db.database import Base
@@ -64,6 +64,11 @@ class PostProcessing(Base):
     comment = Column(Text, nullable=True)  # Комментарий оператора
     processed_at = Column(DateTime(timezone=True), nullable=True)  # Дата обработки
     
+    # Данные отправленного уведомления (для последующего удаления)
+    notify_chat_id = Column(BigInteger, nullable=True)
+    notify_message_id = Column(Integer, nullable=True)
+    notify_sent_at = Column(DateTime(timezone=True), nullable=True)
+
     # Отношения
     post = relationship("Post", back_populates="processing_records")
     operator = relationship("User", back_populates="processed_posts")
