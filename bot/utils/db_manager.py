@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from bot.repo.chammel_repo import ChannelRepository
 from bot.repo.keyword_repo import KeyWordRepo
 from bot.repo.user_repo import UserRepository
+from bot.repo.telethon_repo import TelethonAccountRepository
 
 
 class DBManager:
@@ -15,6 +16,7 @@ class DBManager:
         self.user = UserRepository(self.session)
         self.channel = ChannelRepository(self.session)
         self.keywords = KeyWordRepo(self.session)
+        self.telethon = TelethonAccountRepository(self.session)
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):

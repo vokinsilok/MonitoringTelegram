@@ -1,6 +1,6 @@
 from pydantic import BaseModel
-from sqlalchemy import select, insert
-from typing import List
+from sqlalchemy import select, insert, update
+from typing import List, Optional
 
 from bot.models.user_model import User, UserRole
 from bot.repo.base_repo import BaseRepository
@@ -30,3 +30,39 @@ class UserRepository(BaseRepository):
         stmt = select(User).where(User.role == UserRole.ADMIN.value)
         obj = await self.session.execute(stmt)
         return obj.scalars().all()
+
+    async def list_users(
+        self,
+        *,
+        is_operator: Optional[bool] = None,
+        is_active: Optional[bool] = None,
+        role: Optional[str] = None,
+        page: int = 1,
+        per_page: int = 10,
+    ) -> List[User]:
+        stmt = select(User)
+        if is_operator is not None:
+            stmt = stmt.where(User.is_operator == is_operator)
+        if is_active is not None:
+            stmt = stmt.where(User.is_active == is_active)
+        if role is not None:
+            stmt = stmt.where(User.role == role)
+        stmt = stmt.order_by(User.id).offset((page - 1) * per_page).limit(per_page)
+        obj = await self.session.execute(stmt)
+        return obj.scalars().all()
+
+    async def get_operators(self, page: int = 1, per_page: int = 10) -> List[User]:
+        return await self.list_users(is_operator=True, page=page, per_page=per_page)
+
+    async def update_user(self, user_id: int, values: dict) -> User | None:
+        upd = (
+            update(User)
+            .where(User.id == user_id)
+            .values(**values)
+            .returning(User)
+        )
+        obj = await self.session.execute(upd)
+        user = obj.scalar()
+        if user:
+            await self.session.commit()
+        return user

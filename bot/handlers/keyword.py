@@ -4,7 +4,7 @@ from aiogram.fsm.state import StatesGroup, State
 from aiogram.types import Message, CallbackQuery
 
 from app.core.logging import main_logger
-from bot.keyboards.keyboards import get_channel_proposal_keyboard, get_keyword_proposal_keyboard
+from bot.keyboards.keyboards import get_keyword_proposal_keyboard
 from bot.models.keyword import KeywordType
 from bot.schemas.keyword_schema import KeyWordProposalCreateSchema, KeyWordProposalSchema, KeyWordCreateSchema
 from bot.service.keywords_service import KeyWordsService
@@ -84,7 +84,7 @@ async def process_confirmation(message: Message, state: FSMContext):
                     keyword_service = KeyWordsService(db)
                     keyword_proposal = await keyword_service.create_keyword_proposal(data)
                     if keyword_proposal:
-                        await notify_admins_about_keyword_proposal(message.bot, keyword_proposal, message.from_user.username)
+                        await notify_admins_about_keyword_proposal(message.bot, keyword_proposal)
                         await message.answer("Спасибо! Ваше предложение было принято.")
                     else:
                         await message.answer(
@@ -114,7 +114,7 @@ async def process_confirmation(message: Message, state: FSMContext):
     await state.clear()
 
 
-async def notify_admins_about_keyword_proposal(bot: Bot, proposal: KeyWordProposalSchema, operator_username: str | None):
+async def notify_admins_about_keyword_proposal(bot: Bot, proposal: KeyWordProposalSchema):
     """Уведомляет администраторов о новом предложении ключевого слова"""
     try:
         async with get_atomic_db() as db:
@@ -123,6 +123,16 @@ async def notify_admins_about_keyword_proposal(bot: Bot, proposal: KeyWordPropos
             if not admins:
                 main_logger.warning("No admins found to notify about keyword proposal.")
                 return
+
+            # Получаем автора предложения, чтобы корректно отобразить тег/упоминание
+            operator = await user_service.get_user_by_filter(id=proposal.operator_id)
+            if operator and operator.username:
+                operator_display = f"@{operator.username}"
+            else:
+                name_parts = [p for p in [getattr(operator, 'first_name', None), getattr(operator, 'last_name', None)] if p] if operator else []
+                visible_name = " ".join(name_parts) if name_parts else "Пользователь"
+                operator_display = f"<a href=\"tg://user?id={getattr(operator, 'telegram_id', 0)}\">{visible_name}</a>"
+
             keyboard = get_keyword_proposal_keyboard(proposal.id)
             for admin in admins:
                 await bot.send_message(
@@ -130,7 +140,7 @@ async def notify_admins_about_keyword_proposal(bot: Bot, proposal: KeyWordPropos
                     text=(
                         f"🔍 <b>Новое предложение ключевого слова</b>\n\n"
                         f"Слово: <code>{proposal.text}</code>\n"
-                        f"От: @{operator_username or 'unknown'}\n"
+                        f"От: {operator_display}\n"
                         f"Комментарий: {proposal.comment or '—'}\n"
                         f"Статус: {proposal.status}"
                     ),

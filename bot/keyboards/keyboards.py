@@ -116,13 +116,12 @@ def get_main_keyboard(is_admin: bool = False, is_operator: bool = False) -> Repl
         add_keyword_button = KeyboardButton(text="🔑 Добавить ключевое слово")
         manage_operators_button = KeyboardButton(text="👥 Управление операторами")
         add_telethon_button = KeyboardButton(text="🔐 Добавить Telethon")
-        view_requests_button = KeyboardButton(text="📝 Обращения")
         
         # Создаем массив кнопок для клавиатуры
         keyboard_buttons = [
             [add_channel_button, add_keyword_button],
             [manage_operators_button, add_telethon_button],
-            [report_button, view_requests_button]
+            [report_button]
         ]
     elif is_operator:
         # Кнопки для оператора
@@ -137,14 +136,13 @@ def get_main_keyboard(is_admin: bool = False, is_operator: bool = False) -> Repl
         ]
     else:
         # Кнопки для обычного пользователя (клиента)
-        new_request_button = KeyboardButton(text="📝 Новое обращение")
-        my_requests_button = KeyboardButton(text="🔍 Мои обращения")
+        new_request_button = KeyboardButton(text="📝 Получить доступ оператора")
         feedback_button = KeyboardButton(text="💬 Обратная связь")
-        help_button = KeyboardButton(text="❓ Помощь")
+        help_button = KeyboardButton(text="❓О системе")
         
         # Создаем массив кнопок для клавиатуры
         keyboard_buttons = [
-            [new_request_button, my_requests_button],
+            [new_request_button],
             [feedback_button, help_button]
         ]
     
@@ -153,4 +151,22 @@ def get_main_keyboard(is_admin: bool = False, is_operator: bool = False) -> Repl
     
     return keyboard
 
+def get_operator_access_request_keyboard(user_id: int) -> InlineKeyboardMarkup:
+    """
+    Создает клавиатуру для запроса доступа оператора.
 
+    Args:
+        user_id: ID пользователя, которому предлагается доступ оператора
+
+    Returns:
+        InlineKeyboardMarkup: Клавиатура с кнопками для одобрения/отклонения доступа
+    """
+    approve_button = InlineKeyboardButton(
+        text="✅ Выдать доступ",
+        callback_data=f"approve_operator:{user_id}"
+    )
+    reject_button = InlineKeyboardButton(
+        text="❌ Отклонить",
+        callback_data=f"reject_operator:{user_id}"
+    )
+    return InlineKeyboardMarkup(inline_keyboard=[[approve_button, reject_button]])

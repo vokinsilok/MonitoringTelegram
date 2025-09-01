@@ -9,6 +9,9 @@ from aiogram.client.default import DefaultBotProperties
 
 from bot.handlers.channel import router as router_channel
 from bot.handlers.keyword import router as router_keyword
+from bot.handlers.operators import router as router_operators
+from bot.handlers.general import router as router_general
+from bot.handlers.telethon import router as router_telethon
 from app.core.config import settings
 from app.core.logging import main_logger
 from bot.keyboards.keyboards import get_main_keyboard
@@ -94,6 +97,9 @@ async def main() -> None:
     # Регистрируем роутеры
     dp.include_router(router=router_channel)
     dp.include_router(router=router_keyword)
+    dp.include_router(router=router_operators)
+    dp.include_router(router=router_general)
+    dp.include_router(router=router_telethon)
     main_logger.info("Starting bot")
 
     # Запускаем бота

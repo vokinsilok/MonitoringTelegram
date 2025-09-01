@@ -186,17 +186,28 @@ async def notify_admins_about_channel_proposal(bot: Bot, proposal, operator_user
     try:
         async with get_atomic_db() as db:
             # Получаем список всех администраторов
-            admins = await UserService(db).get_admins()
+            user_service = UserService(db)
+            admins = await user_service.get_admins()
 
             if not admins:
                 main_logger.warning("Нет администраторов для отправки уведомления о предложении канала")
                 return
 
+            # Определяем отображение автора предложения
+            operator_user = await user_service.get_user_by_filter(telegram_id=proposal.operator_id)
+            if operator_user and operator_user.username:
+                operator_display = f"@{operator_user.username}"
+            else:
+                # Формируем видимое имя и кликабельную ссылку
+                name_parts = [p for p in [getattr(operator_user, 'first_name', None), getattr(operator_user, 'last_name', None)] if p] if operator_user else []
+                visible_name = " ".join(name_parts) if name_parts else "Пользователь"
+                operator_display = f"<a href=\"tg://user?id={proposal.operator_id}\">{visible_name}</a>"
+
             # Формируем текст уведомления
             notification_text = (
                 f"📢 <b>Новое предложение канала</b>\n\n"
                 f"Канал: @{proposal.channel_username}\n"
-                f"Предложил: @{operator_username}\n"
+                f"Предложил: {operator_display}\n"
                 f"Комментарий: {proposal.comment or 'Отсутствует'}\n\n"
                 f"Пожалуйста, рассмотрите предложение."
             )
