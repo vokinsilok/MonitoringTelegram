@@ -10,6 +10,11 @@ class UserRepository(BaseRepository):
     model = User
     schema = None
 
+    async def get_user_by_filter(self, **filters):
+        stmt = select(User).filter_by(**filters)
+        obj = await self.session.execute(stmt)
+        return obj.scalar()
+
     async def get_or_create_user(self, telegram_id: int, data: BaseModel):
         stmt = select(User).where(User.telegram_id == telegram_id)
         obj = await self.session.execute(stmt)

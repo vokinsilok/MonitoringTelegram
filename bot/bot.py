@@ -7,10 +7,9 @@ from aiogram.types import Message
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.client.default import DefaultBotProperties
 
+from bot.handlers.channel import router as router_channel
 from app.core.config import settings
 from app.core.logging import main_logger
-from bot.handlers.admin import router as admin_router
-from bot.handlers.operator import router as operator_router
 from bot.keyboards.keyboards import get_main_keyboard
 from bot.models.user_model import UserRole
 from bot.schemas.user_schema import CreateUserSchema
@@ -92,8 +91,7 @@ async def main() -> None:
     main_logger.info("Configuring bot")
 
     # Регистрируем роутеры
-    dp.include_router(router=operator_router)
-    dp.include_router(router=admin_router)
+    dp.include_router(router=router_channel)
     main_logger.info("Starting bot")
 
     # Запускаем бота

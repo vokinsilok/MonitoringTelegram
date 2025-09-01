@@ -83,3 +83,21 @@ class ChannelService(BaseService):
         )
             
         return proposal
+
+    async def get_channel_by_filter(self, **filters) -> Channel | None:
+        """
+        Получает канал по заданным фильтрам.
+
+        :param filters: Фильтры для поиска канала.
+        :return: Channel | None: Найденный канал или None, если не найден.
+        """
+        return await self.db.channel.get_channel_by_filter(**filters)
+
+    async def create_channel(self, data: AddChannel) -> Channel:
+        """
+        Создает новый канал в базе данных.
+
+        :param data: Данные нового канала.
+        :return: Channel: Созданный канал.
+        """
+        return await self.db.channel.create_channel(data)

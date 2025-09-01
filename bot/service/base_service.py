@@ -17,3 +17,4 @@ class BaseService:
         moscow_time = datetime.now(moscow_tz).replace(tzinfo=None)
         return moscow_time
 
+

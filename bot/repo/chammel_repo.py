@@ -51,3 +51,9 @@ class ChannelRepository(BaseRepository):
         obj = await self.session.execute(stmt)
         await self.session.commit()
         return obj.scalar()
+
+    async def get_channel_by_filter(self, **filters) -> Channel:
+        stmt = select(Channel).filter_by(**filters)
+        obj = await self.session.execute(stmt)
+        return obj.scalar_one_or_none()
+
