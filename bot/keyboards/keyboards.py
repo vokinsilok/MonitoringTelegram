@@ -68,6 +68,32 @@ def get_channel_proposal_keyboard(proposal_id: int) -> InlineKeyboardMarkup:
     
     return keyboard
 
+def get_keyword_proposal_keyboard(proposal_id: int) -> InlineKeyboardMarkup:
+    """
+    Создает клавиатуру для подтверждения или отклонения предложения ключевого слова.
+
+    Args:
+        proposal_id: ID предложения ключевого слова
+
+    Returns:
+        InlineKeyboardMarkup: Клавиатура с кнопками для подтверждения/отклонения
+    """
+    # Кнопки для подтверждения или отклонения предложения
+    approve_button = InlineKeyboardButton(
+        text="✅ Подтвердить",
+        callback_data=f"approve_keyword:{proposal_id}"
+    )
+
+    reject_button = InlineKeyboardButton(
+        text="❌ Отклонить",
+        callback_data=f"reject_keyword:{proposal_id}"
+    )
+
+    # Создаем клавиатуру с обязательным полем inline_keyboard
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[[approve_button, reject_button]])
+
+    return keyboard
+
 
 def get_main_keyboard(is_admin: bool = False, is_operator: bool = False) -> ReplyKeyboardMarkup:
     """

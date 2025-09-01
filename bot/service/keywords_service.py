@@ -1,7 +1,8 @@
 from typing import List
 
 from bot.models.keyword import KeywordType
-from bot.schemas.keyword_schema import KeyWordSchema, UpdateKeyWordSchema
+from bot.schemas.keyword_schema import KeyWordSchema, UpdateKeyWordSchema, KeyWordProposalCreateSchema, \
+    KeyWordProposalSchema
 from bot.service.base_service import BaseService
 
 
@@ -58,3 +59,74 @@ class KeyWordsService(BaseService):
             return None
         updated_keyword = await self.db.keywords.update_keyword(keyword_id, data)
         return updated_keyword
+
+    async def create_keyword_proposal(self, data: KeyWordProposalCreateSchema) -> KeyWordProposalSchema:
+        """
+        Создает новое предложение ключевого слова в базе данных.
+
+        :param data: Данные для создания предложения ключевого слова.
+        :return: Созданное предложение ключевого слова.
+        """
+        new_proposal = await self.db.keywords.create_keyword_proposal(data)
+        return new_proposal
+
+    async def update_keyword_proposal(self, proposal_id: int, data: dict) -> KeyWordProposalSchema | None:
+        """
+        Обновляет существующее предложение ключевого слова в базе данных.
+
+        :param proposal_id: ID предложения ключевого слова для обновления.
+        :param data: Данные для обновления предложения ключевого слова.
+        :return: Обновленное предложение ключевого слова или None, если не найдено.
+        """
+        existing_proposal = await self.db.keywords.get_keyword_proposal_by_filter(id=proposal_id)
+        if not existing_proposal:
+            return None
+        updated_proposal = await self.db.keywords.update_keyword_proposal(proposal_id, data)
+        return updated_proposal
+
+
+    async def approve_keyword_proposal(self, proposal_id: int, admin_comment: str | None = None, ) -> KeyWordProposalSchema | None:
+        """
+        Одобряет предложение ключевого слова и создает ключевое слово, если оно не существует.
+
+        :param proposal_id: ID предложения ключевого слова для одобрения.
+        :param admin_comment: Комментарий администратора (необязательно).
+        :return: Обновленное предложение ключевого слова или None, если не найдено.
+        """
+        proposal = await self.db.keywords.get_keyword_proposal_by_filter(id=proposal_id)
+        if not proposal or proposal.status != "pending":
+            return None
+
+        # Проверяем, существует ли уже ключевое слово
+        existing_keyword = await self.db.keywords.get_keyword_by_filter(text=proposal.text)
+        if not existing_keyword:
+            # Создаем новое ключевое слово
+            await self.create(proposal.text)
+
+        # Обновляем статус предложения на "approved"
+        update_data = {
+            "status": "approved",
+            "admin_comment": admin_comment
+        }
+        updated_proposal = await self.update_keyword_proposal(proposal_id, update_data)
+        return updated_proposal
+
+    async def reject_keyword_proposal(self, proposal_id: int, admin_comment: str | None = None) -> KeyWordProposalSchema | None:
+        """
+        Отклоняет предложение ключевого слова.
+
+        :param proposal_id: ID предложения ключевого слова для отклонения.
+        :param admin_comment: Комментарий администратора (необязательно).
+        :return: Обновленное предложение ключевого слова или None, если не найдено.
+        """
+        proposal = await self.db.keywords.get_keyword_proposal_by_filter(id=proposal_id)
+        if not proposal or proposal.status != "pending":
+            return None
+
+        # Обновляем статус предложения на "rejected"
+        update_data = {
+            "status": "rejected",
+            "admin_comment": admin_comment
+        }
+        updated_proposal = await self.update_keyword_proposal(proposal_id, update_data)
+        return updated_proposal
