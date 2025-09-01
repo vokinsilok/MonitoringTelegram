@@ -33,6 +33,8 @@ class User(Base):
     
     # Отношения
     proposed_channels = relationship("ChannelProposal", back_populates="operator")
+    proposed_keywords = relationship("KeywordProposal", back_populates="operator")
+    processed_posts = relationship("PostProcessing", back_populates="operator")
 
 
     @property
@@ -42,7 +44,7 @@ class User(Base):
 
     @property
     def is_operator_role(self) -> bool:
-        """Проверка, является ли пользователь оператором по роли"""
+        """Проверка, является ли пользо��атель оператором по роли"""
         return self.role == UserRole.OPERATOR.value
 
     @property

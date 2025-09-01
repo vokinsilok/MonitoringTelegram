@@ -6,6 +6,8 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
 from app.db.database import Base
+# Регистрация зависимых моделей до конфигурации отношений
+from .post import Post  # noqa: F401
 
 
 class ChannelStatus(str, Enum):
@@ -24,7 +26,7 @@ class ProposalStatus(str, Enum):
 
 class Channel(Base):
     """
-    Модель Telegram-канала для мониторинга.
+    Модель Telegram-канала для монитор��нга.
     """
     __tablename__ = "channel"
     
@@ -43,7 +45,7 @@ class Channel(Base):
     last_checked = Column(DateTime(timezone=True), nullable=True)
     
     # Отношения
-    # posts = relationship("Post", back_populates="channel")
+    posts = relationship("Post", back_populates="channel")
 
 
 class ChannelProposal(Base):

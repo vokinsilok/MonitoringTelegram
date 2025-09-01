@@ -5,6 +5,8 @@ from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
 
 from app.db.database import Base
+# Импортируем клас��, чтобы он был зарегистрирован в реестре до конфигурации отношений
+from .post import PostKeywordMatch  # noqa: F401
 
 
 class KeywordType(str, Enum):
