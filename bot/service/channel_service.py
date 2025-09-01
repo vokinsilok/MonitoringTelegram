@@ -1,4 +1,4 @@
-from bot.schemas.channel import AddChannelProposal, AddChannel
+from bot.schemas.channel import AddChannelProposal, AddChannel, ChannelSchema
 from bot.service.base_service import BaseService
 from bot.models.channel import ChannelProposal, Channel, ProposalStatus
 
@@ -31,31 +31,13 @@ class ChannelService(BaseService):
         if proposal.status != ProposalStatus.PENDING.value:
             return proposal
             
-        # Создаем новый канал на основе предложения
-        channel_data = {
-            "username": proposal.channel_username,
-            "is_active": True
-        }
-        
-        # Создаем канал
-        new_channel = await self.db.channel.create_channel(AddChannel(
-            channel_username=proposal.channel_username
-            if proposal.channel_username else None,
-            title=proposal.channel_username if proposal.channel_username else "Unnamed Channel",
-            invite_link=None,  # При необходимости можно добавить логику для invite_link
-            status="active",
-            description=None,  # При необходимости можно добавить логику для description
-            is_private=False,  # При необходимости можно добавить логику для is_private
-            last_parsed_message_id=None,  # При необходимости можно добавить логику для last_parsed_message_id
-            last_checked=None  # При необходимости можно добавить логику для last_checked
-        ))
-        
-        if new_channel:
-            # Обновляем статус предложения на APPROVED
-            proposal = await self.db.channel.update_channel_proposal_status(
-                proposal_id, 
-                ProposalStatus.APPROVED.value
-            )
+        channel = await self.db.channel.get_channel_by_filter(id=proposal.channel_id)
+        if not channel:
+            return None
+
+        channel.status = "active"
+        proposal.status = ProposalStatus.APPROVED.value
+        await self.db.session.commit()
             
         return proposal
         
@@ -84,7 +66,7 @@ class ChannelService(BaseService):
             
         return proposal
 
-    async def get_channel_by_filter(self, **filters) -> Channel | None:
+    async def get_channel_by_filter(self, **filters) -> ChannelSchema | None:
         """
         Получает канал по заданным фильтрам.
 
@@ -93,7 +75,7 @@ class ChannelService(BaseService):
         """
         return await self.db.channel.get_channel_by_filter(**filters)
 
-    async def create_channel(self, data: AddChannel) -> Channel:
+    async def create_channel(self, data: AddChannel) -> ChannelSchema:
         """
         Создает новый канал в базе данных.
 

@@ -2,18 +2,11 @@ FROM python:3.12
 
 WORKDIR /app
 
-# Установка зависимостей для PostgreSQL
-RUN apt-get update && apt-get install -y \
-    libpq-dev \
-    gcc \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+COPY requirements.txt .
 
-# Копирование файлов проекта
+RUN pip install --upgrade pip && pip install -r requirements.txt
+
 COPY . .
-
-# Установка зависимостей Python
-RUN pip install --no-cache-dir -r requirements.txt
 
 # Запуск бота
 CMD ["python", "-m", "bot.bot"]

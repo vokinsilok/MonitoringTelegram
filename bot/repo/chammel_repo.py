@@ -57,3 +57,5 @@ class ChannelRepository(BaseRepository):
         obj = await self.session.execute(stmt)
         return obj.scalar_one_or_none()
 
+
+

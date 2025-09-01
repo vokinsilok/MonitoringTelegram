@@ -9,6 +9,10 @@ from app.db.database import Base
 from app.core.config import settings
 from bot.models.user_model import User
 from bot.models.channel import Channel, ChannelProposal
+# Ensure all models are imported so that their tables are registered in Base.metadata
+from bot.models.keyword import Keyword, KeywordProposal  # noqa: F401
+from bot.models.post import Post, PostKeywordMatch, PostProcessing  # noqa: F401
+from bot.models.telethon_account import TelethonAccount  # noqa: F401
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

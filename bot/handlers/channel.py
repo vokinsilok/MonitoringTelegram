@@ -20,7 +20,6 @@ class ChannelProposalForm(StatesGroup):
     waiting_for_confirmation = State()
 
 
-
 @router.message(F.text.startswith("📢 Предложить канал"))
 async def cmd_propose_channel(message: Message, state: FSMContext):
     """Начать процесс предложения канала"""
@@ -118,139 +117,35 @@ async def process_confirmation(message: Message, state: FSMContext):
                     title = channel_username if channel_username else "Unnamed Channel"
                     invite_link = channel_link if channel_link.startswith("http") else None
                     description = comment
-                    await channel_service.add_channel_proposal(AddChannelProposal(
-                        channel_username=channel_username if channel_username else None,
-                        operator_id=telegram_id,
-                        status="approved",
-                        comment="",
-                        admin_comment=comment
-                    ))
-                    await channel_service.create_channel(AddChannel(
+                    new_channel = await channel_service.create_channel(AddChannel(
                         channel_username=channel_username if channel_username else None,
                         title=title,
                         invite_link=invite_link,
-                        status="active",
+                        status="disabled",
                         description=description,
                         is_private=False,
                         last_parsed_message_id=None,
                         last_checked=None)
                     )
-                    await message.answer(f"Канал {channel_link} успешно добавлен для мониторинга.")
+
+                    channel_proposal = await channel_service.add_channel_proposal(AddChannelProposal(
+                        channel_id=new_channel.id,
+                        channel_username=channel_username if channel_username else None,
+                        operator_id=telegram_id,
+                        status="pending",
+                        comment="",
+                        admin_comment=comment
+                    ))
+
+                    await notify_admins_about_channel_proposal(message.bot, channel_proposal,
+                                                               message.from_user.username)
+                    await message.answer(f"Канал {channel_link} успешно добавлен на рассмотрение.")
             except Exception as e:
                 main_logger.error(f"Ошибка при добавлении канала админом: {e}")
                 await message.answer("Произошла ошибка при добавлении канала. Пожалуйста, попробуйте позже.")
     else:
         await message.answer("Добавление канала отменено.")
 
-    # Сбрасываем состояние
-    await state.clear()
-
-
-
-
-@router.message(ChannelProposalForm.waiting_for_channel)
-async def process_channel_proposal(message: Message, state: FSMContext):
-    """Обработать отправленный канал"""
-    channel_link = message.text.strip()
-
-    # Сохраняем данные в состоянии
-    await state.update_data(channel_link=channel_link)
-
-    # Запрашиваем комментарий
-    await message.answer(
-        "Пожалуйста, добавьте комментарий, почему этот канал стоит мониторить"
-    )
-    await state.set_state(ChannelProposalForm.waiting_for_comment)
-
-
-@router.message(ChannelProposalForm.waiting_for_comment)
-async def process_channel_comment(message: Message, state: FSMContext):
-    """Обработать комментарий к предложению канала"""
-    comment = message.text.strip()
-
-    # Сохраняем данные в состоянии
-    await state.update_data(comment=comment)
-
-    # Получаем данные из состояния
-    data = await state.get_data()
-    channel_link = data.get("channel_link")
-
-    # Запрашиваем подтверждение
-    await message.answer(
-        f"Вы хотите предложить канал {channel_link} для мониторинга?\n"
-        f"Комментарий: {comment}\n\n"
-        f"Отправьте 'да' для подтверждения или 'нет' для отмены."
-    )
-    await state.set_state(ChannelProposalForm.waiting_for_confirmation)
-
-
-@router.message(ChannelProposalForm.waiting_for_confirmation)
-async def process_channel_confirmation(message: Message, state: FSMContext):
-    """Обработать подтверждение предложения канала"""
-    confirmation = message.text.lower().strip()
-
-    if confirmation in ["да", "yes", "y"]:
-        # Получаем данные из состояния
-        data = await state.get_data()
-        channel_link = data.get("channel_link")
-
-        # Обрабатываем разные форматы ссылок на каналы
-        if channel_link.startswith("https://t.me/"):
-            # Обработка полной ссылки на канал
-            parts = channel_link.split("https://t.me/")[1].split("/")
-            channel_username = parts[0]
-
-            # Проверка на наличие дополнительных параметров в URL
-            if "?" in channel_username:
-                channel_username = channel_username.split("?")[0]
-
-        elif channel_link.startswith("@"):
-            channel_username = channel_link[1:]  # Убираем символ @
-        else:
-            channel_username = channel_link  # Предполагаем, что это просто username
-
-        # Логируем исходную ссылку и обработанное имя канала
-        main_logger.info(f"Исходная ссылка: {channel_link}, Обработанное имя канала: {channel_username}")
-
-        try:
-            # Проверяем, что имя канала не пустое
-            if not channel_username or channel_username.isspace():
-                await message.answer("Ошибка: Имя канала не может быть пустым")
-                await state.clear()
-                return
-
-            async with get_atomic_db() as db:
-                data = AddChannelProposal(
-                    channel_username=channel_username,
-                    operator_id=message.from_user.id,
-                    comment=data.get("comment")
-                )
-                new_channel_proposal = await ChannelService(db).add_channel_proposal(data)
-
-            if new_channel_proposal:
-                # Отправляем сообщение пользователю
-                await message.answer(
-                    f"Канал @{channel_username} успешно предложен для мониторинга.\n")
-
-                # Отправляем уведомления всем администраторам
-                await notify_admins_about_channel_proposal(message.bot, new_channel_proposal,
-                                                           message.from_user.username)
-            else:
-                await message.answer("Не удалось сохранить предложение канала. Попробуйте позже.")
-        except Exception as e:
-            error_msg = str(e)
-            main_logger.error(error_msg)
-            if "chat not found" in error_msg.lower():
-                await message.answer(f"Ошибка: Канал {channel_username} не найден. Убедитесь, что:"
-                                     f"\n1. Канал существует"
-                                     f"\n2. Вы указали правильное имя канала (начинается с @)"
-                                     f"\n3. Если канал приватный, бот должен быть добавлен в него")
-            else:
-                await message.answer(f"Ошибка при получении информации о канале: {error_msg}")
-    else:
-        await message.answer("Предложение канала отменено.")
-
-    # Сбрасываем состояние
     await state.clear()
 
 

@@ -6,7 +6,13 @@ class AddChannelProposal(BaseModel):
     operator_id: int
     status: str = "pending"
     comment: str
+    channel_id: int
     admin_comment: str | None = None
+
+
+class ChannelProposalShema(AddChannelProposal):
+    id: int
+
 
 
 class AddChannel(BaseModel):
@@ -18,3 +24,6 @@ class AddChannel(BaseModel):
     is_private: bool = False
     last_parsed_message_id: int | None = None
     last_checked: str | None = None  # ISO format datetime string
+
+class ChannelSchema(AddChannel):
+    id: int
