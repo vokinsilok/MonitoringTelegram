@@ -100,49 +100,81 @@ async def process_confirmation(message: Message, state: FSMContext):
 
         async with get_atomic_db() as db:
             user_permissions = await UserService(db).cheek_user_permissions(telegram_id)
-            if not user_permissions["is_operator"]:
+
+            # Проверяем, является ли пользователь оператором или администратором
+            if user_permissions["is_operator"]:
+                # Если пользователь - оператор, создаем предложение на добавление канала и сам канал
+                try:
+                    from bot.service.channel_service import ChannelService
+                    channel_service = ChannelService(db)
+                    existing_channel = await channel_service.get_channel_by_filter(invite_link=channel_link)
+                    if existing_channel:
+                        await message.answer(f"Канал {channel_link} уже добавлен для мониторинга.")
+                    else:
+                        channel_username = channel_link.lstrip("@").replace("https://t.me/", "").replace("http://t.me/", "")
+                        title = channel_username if channel_username else "Unnamed Channel"
+                        invite_link = channel_link if channel_link.startswith("http") else None
+                        description = comment
+                        new_channel = await channel_service.create_channel(AddChannel(
+                            channel_username=channel_username if channel_username else None,
+                            title=title,
+                            invite_link=invite_link,
+                            status="disabled",
+                            description=description,
+                            is_private=False,
+                            last_parsed_message_id=None,
+                            last_checked=None)
+                        )
+
+                        channel_proposal = await channel_service.add_channel_proposal(AddChannelProposal(
+                            channel_id=new_channel.id,
+                            channel_username=channel_username if channel_username else None,
+                            operator_id=telegram_id,
+                            status="pending",
+                            comment="",
+                            admin_comment=comment
+                        ))
+
+                        await notify_admins_about_channel_proposal(message.bot, channel_proposal,
+                                                                   message.from_user.username)
+                        await message.answer(f"Канал {channel_link} успешно добавлен на рассмотрение.")
+                except Exception as e:
+                    main_logger.error(f"Ошибка при добавлении канала админом: {e}")
+                    await message.answer("Произошла ошибка при добавлении канала. Пожалуйста, попробуйте позже.")
+            elif user_permissions["is_admin"]:
+                # Если пользователь - администратор, создаем только сам канал
+                try:
+                    from bot.service.channel_service import ChannelService
+                    channel_service = ChannelService(db)
+                    existing_channel = await channel_service.get_channel_by_filter(invite_link=channel_link)
+                    if existing_channel:
+                        await message.answer(f"Канал {channel_link} уже добавлен для мониторинга.")
+                    else:
+                        channel_username = channel_link.lstrip("@").replace("https://t.me/", "").replace("http://t.me/", "")
+                        title = channel_username if channel_username else "Unnamed Channel"
+                        invite_link = channel_link if channel_link.startswith("http") else None
+                        description = comment
+                        new_channel = await channel_service.create_channel(AddChannel(
+                            channel_username=channel_username if channel_username else None,
+                            title=title,
+                            invite_link=invite_link,
+                            status="active",
+                            description=description,
+                            is_private=False,
+                            last_parsed_message_id=None,
+                            last_checked=None)
+                        )
+                        if new_channel:
+                            main_logger.info(f"Канал {channel_link} успешно добавлен администратором {telegram_id}")
+                            await message.answer(f"Канал {channel_link} успешно добавлен для мониторинга.")
+                        else:
+                            await message.answer("Произошла ошибка при добавлении канала. Пожалуйста, попробуйте позже.")
+
+                except Exception as e:
+                    main_logger.error(f"Ошибка при добавлении канала админом: {e}")
+                    await message.answer("Произошла ошибка при добавлении канала. Пожалуйста, попробуйте позже.")
+            else:
                 await message.answer("У вас нет прав для добавления каналов.")
-                await state.clear()
-                return
-
-            # Добавляем канал в базу данных
-            try:
-                from bot.service.channel_service import ChannelService
-                channel_service = ChannelService(db)
-                existing_channel = await channel_service.get_channel_by_filter(invite_link=channel_link)
-                if existing_channel:
-                    await message.answer(f"Канал {channel_link} уже добавлен для мониторинга.")
-                else:
-                    channel_username = channel_link.lstrip("@").replace("https://t.me/", "").replace("http://t.me/", "")
-                    title = channel_username if channel_username else "Unnamed Channel"
-                    invite_link = channel_link if channel_link.startswith("http") else None
-                    description = comment
-                    new_channel = await channel_service.create_channel(AddChannel(
-                        channel_username=channel_username if channel_username else None,
-                        title=title,
-                        invite_link=invite_link,
-                        status="disabled",
-                        description=description,
-                        is_private=False,
-                        last_parsed_message_id=None,
-                        last_checked=None)
-                    )
-
-                    channel_proposal = await channel_service.add_channel_proposal(AddChannelProposal(
-                        channel_id=new_channel.id,
-                        channel_username=channel_username if channel_username else None,
-                        operator_id=telegram_id,
-                        status="pending",
-                        comment="",
-                        admin_comment=comment
-                    ))
-
-                    await notify_admins_about_channel_proposal(message.bot, channel_proposal,
-                                                               message.from_user.username)
-                    await message.answer(f"Канал {channel_link} успешно добавлен на рассмотрение.")
-            except Exception as e:
-                main_logger.error(f"Ошибка при добавлении канала админом: {e}")
-                await message.answer("Произошла ошибка при добавлении канала. Пожалуйста, попробуйте позже.")
     else:
         await message.answer("Добавление канала отменено.")
 

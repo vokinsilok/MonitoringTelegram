@@ -1,4 +1,4 @@
-from aiogram import Router, F
+from aiogram import Router, F, Bot
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.types import Message, CallbackQuery
@@ -6,7 +6,7 @@ from aiogram.types import Message, CallbackQuery
 from app.core.logging import main_logger
 from bot.keyboards.keyboards import get_channel_proposal_keyboard, get_keyword_proposal_keyboard
 from bot.models.keyword import KeywordType
-from bot.schemas.keyword_schema import KeyWordProposalCreateSchema, KeyWordProposalSchema
+from bot.schemas.keyword_schema import KeyWordProposalCreateSchema, KeyWordProposalSchema, KeyWordCreateSchema
 from bot.service.keywords_service import KeyWordsService
 from bot.service.user_service import UserService
 from bot.utils.depend import get_atomic_db
@@ -22,8 +22,14 @@ class KeywordProposalForm(StatesGroup):
 
 
 @router.message(F.text.startswith("🔍 Предложить ключевое слово"))
-async def cmd_propose_channel(message: Message, state: FSMContext):
-    """Начать процесс предложения канала"""
+async def cmd_propose_keyword(message: Message, state: FSMContext):
+    """Начать процесс предложения ключевого слова"""
+    await message.answer("Пожалуйста, введите ключевое слово, которое вы хотите предложить:")
+    await state.set_state(KeywordProposalForm.waiting_for_keyword)
+
+@router.message(F.text.startswith("🔑 Добавить ключевое слово"))
+async def cmd_propose_keyword(message: Message, state: FSMContext):
+    """Начать процесс предложения ключевого слова"""
     await message.answer("Пожалуйста, введите ключевое слово, которое вы хотите предложить:")
     await state.set_state(KeywordProposalForm.waiting_for_keyword)
 
@@ -60,40 +66,55 @@ async def process_confirmation(message: Message, state: FSMContext):
         data = await state.get_data()
         keyword = data['keyword']
         comment = data['comment']
-        operator_id = int(message.from_user.id) if message.from_user.id else None
+        operator_telegram_id = int(message.from_user.id) if message.from_user and message.from_user.id else None
+        async with get_atomic_db() as db:
+            user_permissions = await UserService(db).cheek_user_permissions(operator_telegram_id)
+            if user_permissions.get("is_operator"):
+                try:
+                    user = await UserService(db).get_user_by_filter(telegram_id=operator_telegram_id)
+                    data = KeyWordProposalCreateSchema(
+                            keyword_id=None,
+                            operator_id=user.id,
+                            text=str(keyword),
+                            type=KeywordType.WORD,
+                            status="pending",
+                            comment=comment,
+                            admin_comment=None
+                        )
+                    keyword_service = KeyWordsService(db)
+                    keyword_proposal = await keyword_service.create_keyword_proposal(data)
+                    if keyword_proposal:
+                        await notify_admins_about_keyword_proposal(message.bot, keyword_proposal, message.from_user.username)
+                        await message.answer("Спасибо! Ваше предложение было принято.")
+                    else:
+                        await message.answer(
+                            "Произошла ошибка при обработке вашего предложения. Пожалуйста, попробуйте снова позже.")
+                    main_logger.debug(f"keyword_proposal: {keyword_proposal}")
+                except Exception as e:
+                    main_logger.error(f"Error creating keyword proposal: {e}")
+                    await message.answer(
+                        "Произошла ошибка при обработке вашего предложения. Пожалуйста, попробуйте снова позже.")
+            elif user_permissions.get("is_admin"):
+                # Администраторы могут сразу добавлять ключевые слова
+                try:
+                    await db.keywords.create_keyword(KeyWordCreateSchema(
+                        text=str(keyword),
+                        type=KeywordType.WORD,
+                        is_active=True,
+                        description=comment
+                    ))
+                    await message.answer(f"Ключевое слово '{keyword}' успешно добавлено.")
+                except Exception as e:
+                    main_logger.error(f"Error fetching user for admin keyword addition: {e}")
 
 
-        try:
-            async with get_atomic_db() as db:
-                user = await UserService(db).get_user_by_filter(telegram_id=operator_id)
-                data = KeyWordProposalCreateSchema(
-                    keyword_id=None,
-                    operator_id=user.id,
-                    text=str(keyword),
-                    type=KeywordType.WORD,
-                    status="pending",
-                    comment=comment,
-                    admin_comment=None
-                )
-                keyword_service = KeyWordsService(db)
-                keyword_proposal = await keyword_service.create_keyword_proposal(data)
-            if keyword_proposal:
-                await message.answer("Спасибо! Ваше предложение было принято.")
-            else:
-                await message.answer(
-                    "Произошла ошибка при обработке вашего предложения. Пожалуйста, попробуйте снова позже.")
-            main_logger.debug(f"keyword_proposal: {keyword_proposal}")
-        except Exception as e:
-            main_logger.error(f"Error creating keyword proposal: {e}")
-            await message.answer(
-                "Произошла ошибка при обработке вашего предложения. Пожалуйста, попробуйте снова позже.")
     else:
         await message.answer("Ваше предложение было отменено.")
 
     await state.clear()
 
 
-async def notify_admins_about_keyword_proposal(self, keyword: KeyWordProposalSchema):
+async def notify_admins_about_keyword_proposal(bot: Bot, proposal: KeyWordProposalSchema, operator_username: str | None):
     """Уведомляет администраторов о новом предложении ключевого слова"""
     try:
         async with get_atomic_db() as db:
@@ -102,89 +123,86 @@ async def notify_admins_about_keyword_proposal(self, keyword: KeyWordProposalSch
             if not admins:
                 main_logger.warning("No admins found to notify about keyword proposal.")
                 return
-            keyboards = get_keyword_proposal_keyboard(keyword.keyword_id)
+            keyboard = get_keyword_proposal_keyboard(proposal.id)
             for admin in admins:
-                await self.bot.send_message(
-                    chat_id=admin.id,
+                await bot.send_message(
+                    chat_id=admin.telegram_id,
                     text=(
-                        f"📢 Новое предложение ключевого слова от пользователя {keyword.operator_id}:\n"
-                        f"Ключевое слово: {keyword.text}\n"
-                        f"Комментарий: {keyword.comment}\n"
-                        f"Статус: {keyword.status}"
+                        f"🔍 <b>Новое предложение ключевого слова</b>\n\n"
+                        f"Слово: <code>{proposal.text}</code>\n"
+                        f"От: @{operator_username or 'unknown'}\n"
+                        f"Комментарий: {proposal.comment or '—'}\n"
+                        f"Статус: {proposal.status}"
                     ),
-                    keyboards=keyboards
+                    reply_markup=keyboard
                 )
     except Exception as e:
-        main_logger.error(f"Error creating keyword proposal: {e}")
+        main_logger.error(f"Error notifying admins about keyword proposal: {e}")
 
 
 @router.callback_query(F.data.startswith("approve_keyword:"))
 async def approve_keyword_proposal(callback: CallbackQuery):
-    """Обработчик подтверждения предложения канала администратором"""
+    """Обработчик подтверждения предложения ключевого слова администратором"""
     try:
-        # Извлекаем ID предложения из callback_data
         proposal_id = int(callback.data.split(":")[1])
-        admin_user_id = callback.from_user.id
 
         async with get_atomic_db() as db:
-            # Обновляем статус предложения
-            proposal = await KeyWordsService(db).approve_keyword_proposal(proposal_id,
-                                                                          admin_comment="Approved by admin")
+            proposal = await KeyWordsService(db).approve_keyword_proposal(proposal_id, admin_comment="Approved by admin")
 
             if proposal:
                 await callback.message.edit_text(
-                    f"✅ Предложение канала @{proposal.channel_username} одобрено.\n"
-                    f"Канал добавлен в мониторинг."
+                    f"✅ Предложение ключевого слова '{proposal.text}' одобрено."
                 )
 
                 # Уведомляем оператора о подтверждении предложения
                 try:
-                    await callback.bot.send_message(
-                        chat_id=proposal.operator_id,
-                        text=f"✅ Ваше предложение канала @{proposal.channel_username} было одобрено администратором."
-                    )
+                    user = await UserService(db).get_user_by_filter(id=proposal.operator_id)
+                    if user and user.telegram_id:
+                        await callback.bot.send_message(
+                            chat_id=user.telegram_id,
+                            text=f"✅ Ваше предложение ключевого слова '{proposal.text}' было одобрено администратором."
+                        )
                 except Exception as e:
                     main_logger.error(f"Ошибка при отправке уведомления оператору {proposal.operator_id}: {str(e)}")
             else:
                 await callback.message.edit_text(
                     "Не удалось обновить статус предложения. Возможно, оно уже было обработано.")
     except Exception as e:
-        main_logger.error(f"Ошибка при подтверждении предложения канала: {str(e)}")
+        main_logger.error(f"Ошибка при подтверждении предложения ключевого слова: {str(e)}")
         await callback.message.edit_text(f"Произошла ошибка при обработке предложения: {str(e)}")
     finally:
         await callback.answer()
 
 
-@router.callback_query(F.data.startswith("reject_channel:"))
-async def reject_channel_proposal(callback: CallbackQuery):
-    """Обработчик отклонения предложения канала администратором"""
-
+@router.callback_query(F.data.startswith("reject_keyword:"))
+async def reject_keyword_proposal(callback: CallbackQuery):
+    """Обработчик отклонения предложения ключевого слова администратором"""
     try:
-        # Извлекаем ID предложения из callback_data
         proposal_id = int(callback.data.split(":")[1])
-        admin_user_id = callback.from_user.id
 
         async with get_atomic_db() as db:
-            # Обновляем статус предложения
             proposal = await KeyWordsService(db).reject_keyword_proposal(proposal_id, admin_comment="Rejected by admin")
 
             if proposal:
                 await callback.message.edit_text(
-                    f"❌ Предложение канала @{proposal.channel_username} отклонено.\n"
-                    f"Канал не был добавлен в мониторинг."
+                    f"❌ Предложение ключевого слова '{proposal.text}' отклонено."
                 )
 
                 # Уведомляем оператора об отклонении предложения
                 try:
-                    await callback.bot.send_message(
-                        chat_id=proposal.operator_id,
-                        text=f"❌ Ваше предложение канала @{proposal.channel_username} было отклонено администратором."
-                    )
+                    user = await UserService(db).get_user_by_filter(id=proposal.operator_id)
+                    if user and user.telegram_id:
+                        await callback.bot.send_message(
+                            chat_id=user.telegram_id,
+                            text=f"❌ Ваше предложение ключевого слова '{proposal.text}' было отклонено администратором."
+                        )
                 except Exception as e:
                     main_logger.error(f"Ошибка при отправке уведомления оператору {proposal.operator_id}: {str(e)}")
             else:
                 await callback.message.edit_text(
                     "Не удалось обновить статус предложения. Возможно, оно уже было обработано.")
     except Exception as e:
-        main_logger.error(f"Ошибка при отклонении предложения канала: {str(e)}")
+        main_logger.error(f"Ошибка при отклонении предложения ключевого слова: {str(e)}")
         await callback.message.edit_text(f"Произошла ошибка при обработке предложения: {str(e)}")
+    finally:
+        await callback.answer()

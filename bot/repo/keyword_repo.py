@@ -2,50 +2,46 @@ from typing import List
 
 from sqlalchemy import select, insert, update
 
-from bot.models.keyword import Keyword
+from bot.models.keyword import Keyword, KeywordProposal
 from bot.repo.base_repo import BaseRepository
-from bot.schemas.keyword_schema import KeyWordSchema, KeyWordCreateSchema, UpdateKeyWordSchema, \
-    KeyWordProposalCreateSchema, KeyWordProposalSchema
+from bot.schemas.keyword_schema import (
+    KeyWordSchema,
+    KeyWordCreateSchema,
+    UpdateKeyWordSchema,
+    KeyWordProposalCreateSchema,
+    KeyWordProposalSchema,
+    KeyWordProposalUpdateSchema,
+)
 
 
 class KeyWordRepo(BaseRepository):
     model = Keyword
     schema = KeyWordSchema
 
+    # --------------------- Keyword ---------------------
     async def get_keyword_by_filter(self, **filter_by) -> KeyWordSchema | None:
-        """
-        Получает ключевое слово по заданным фильтрам.
-
-        :param filter_by: Фильтры для поиска ключевого слова.
-        :return: Найденное ключевое слово или None.
-        """
         obj = select(self.model).filter_by(**filter_by)
         result = await self.session.execute(obj)
-        return result.scalar()
+        return result.scalar_one_or_none()
 
-    async def create_keyword(self, data: KeyWordCreateSchema) -> KeyWordSchema:
-        """
-        Создает новое ключевое слово в базе данных.
-
-        :param data: Данные для создания ключевого слова.
-        :return: Созданное ключевое слово.
-        """
-        stmt = insert(self.model).values(**data.model_dump()).returning(self.model)
+    async def create_keyword(self, data: KeyWordCreateSchema | dict) -> KeyWordSchema:
+        payload = data.model_dump() if hasattr(data, "model_dump") else dict(data)
+        if isinstance(payload.get("type"), object) and hasattr(payload["type"], "value"):
+            payload["type"] = payload["type"].value
+        stmt = insert(self.model).values(**payload).returning(self.model)
         result = await self.session.execute(stmt)
         await self.session.commit()
         return result.scalar()
 
-    async def update_keyword(self, keyword_id: int, data: UpdateKeyWordSchema) -> KeyWordSchema:
-        """
-        Обновляет существующее ключевое слово в базе данных.
-
-        :param data: Данные для обновления ключевого слова.
-        :return: Обновленное ключевое слово.
-        """
+    async def update_keyword(self, keyword_id: int, data: UpdateKeyWordSchema | dict) -> KeyWordSchema:
+        payload = data.model_dump() if hasattr(data, "model_dump") else dict(data)
+        payload = {k: v for k, v in payload.items() if v is not None}
+        if isinstance(payload.get("type"), object) and hasattr(payload["type"], "value"):
+            payload["type"] = payload["type"].value
         update_stmt = (
             update(self.model)
             .where(self.model.id == keyword_id)
-            .values(**{k: v for k, v in data.model_dump().items() if v is not None})
+            .values(**payload)
             .returning(self.model)
         )
         update_obj = await self.session.execute(update_stmt)
@@ -54,60 +50,38 @@ class KeyWordRepo(BaseRepository):
         return obj
 
     async def get_all_keywords(self) -> List[KeyWordSchema]:
-        """
-        Получает все ключевые слова из базы данных.
-
-        :return: Список всех ключевых слов.
-        """
         stmt = select(self.model)
         result = await self.session.execute(stmt)
         return result.unique().scalars().all()
 
-    async def create_keyword_proposal(self, data: KeyWordProposalCreateSchema) -> KeyWordProposalSchema:
-        """
-        Создает новое предложение ключевого слова в базе данных.
-
-        :param data: Данные для создания предложения ключевого слова.
-        :return: Созданное предложение ключевого слова.
-        """
-        stmt = insert(self.model).values(**data.model_dump()).returning(self.model)
+    # --------------------- KeywordProposal ---------------------
+    async def create_keyword_proposal(self, data: KeyWordProposalCreateSchema | dict) -> KeyWordProposalSchema:
+        payload = data.model_dump() if hasattr(data, "model_dump") else dict(data)
+        if isinstance(payload.get("type"), object) and hasattr(payload["type"], "value"):
+            payload["type"] = payload["type"].value
+        stmt = insert(KeywordProposal).values(**payload).returning(KeywordProposal)
         result = await self.session.execute(stmt)
         await self.session.commit()
         return result.scalar()
 
     async def get_all_keyword_proposals(self) -> List[KeyWordProposalSchema]:
-        """
-        Получает все предложения ключевых слов из базы данных.
-
-        :return: Список всех предложений ключевых слов.
-        """
-        stmt = select(self.model)
+        stmt = select(KeywordProposal)
         result = await self.session.execute(stmt)
         return result.unique().scalars().all()
 
     async def get_keyword_proposal_by_filter(self, **filter_by) -> KeyWordProposalSchema | None:
-        """
-        Получает предложение ключевого слова по заданным фильтрам.
-
-        :param filter_by: Фильтры для поиска предложения ключевого слова.
-        :return: Найденное предложение ключевого слова или None.
-        """
-        obj = select(self.model).filter_by(**filter_by)
+        obj = select(KeywordProposal).filter_by(**filter_by)
         result = await self.session.execute(obj)
-        return result.scalar()
+        return result.scalar_one_or_none()
 
-    async def update_keyword_proposal(self, proposal_id: int, data: UpdateKeyWordSchema) -> KeyWordProposalSchema:
-        """
-        Обновляет существующее предложение ключевого слова в базе данных.
-
-        :param data: Данные для обновления предложения ключевого слова.
-        :return: Обновленное предложение ключевого слова.
-        """
+    async def update_keyword_proposal(self, proposal_id: int, data: KeyWordProposalUpdateSchema | dict) -> KeyWordProposalSchema:
+        payload = data.model_dump() if hasattr(data, "model_dump") else dict(data)
+        payload = {k: v for k, v in payload.items() if v is not None}
         update_stmt = (
-            update(self.model)
-            .where(self.model.id == proposal_id)
-            .values(**{k: v for k, v in data.model_dump().items() if v is not None})
-            .returning(self.model)
+            update(KeywordProposal)
+            .where(KeywordProposal.id == proposal_id)
+            .values(**payload)
+            .returning(KeywordProposal)
         )
         update_obj = await self.session.execute(update_stmt)
         obj = update_obj.scalar()

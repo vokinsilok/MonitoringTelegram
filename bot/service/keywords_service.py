@@ -1,20 +1,24 @@
 from typing import List
 
 from bot.models.keyword import KeywordType
-from bot.schemas.keyword_schema import KeyWordSchema, UpdateKeyWordSchema, KeyWordProposalCreateSchema, \
-    KeyWordProposalSchema
+from bot.schemas.keyword_schema import (
+    KeyWordSchema,
+    UpdateKeyWordSchema,
+    KeyWordProposalCreateSchema,
+    KeyWordProposalSchema,
+    KeyWordCreateSchema,
+)
 from bot.service.base_service import BaseService
 
 
 class KeyWordsService(BaseService):
-
     async def get_all(self) -> List[KeyWordSchema]:
         """
         Получает все ключевые слова из базы данных.
 
         :return: Список ключевых слов.
         """
-        return await self.db.keywords.get_all()
+        return await self.db.keywords.get_all_keywords()
 
     async def create(self, word: str) -> KeyWordSchema:
         """
@@ -26,14 +30,13 @@ class KeyWordsService(BaseService):
         existing_keyword = await self.db.keywords.get_keyword_by_filter(text=word)
         if existing_keyword:
             return existing_keyword
-        new_keyword = await self.db.keywords.create_keyword(
-            {
-                "text": word,
-                "type": KeywordType.WORD.value,
-                "is_active": True,
-                "description": None
-            }
+        payload = KeyWordCreateSchema(
+            text=word,
+            type=KeywordType.WORD,
+            is_active=True,
+            description=None,
         )
+        new_keyword = await self.db.keywords.create_keyword(payload)
         return new_keyword
 
     async def get_by_filter(self, **filter_by) -> KeyWordSchema | None:
@@ -44,7 +47,6 @@ class KeyWordsService(BaseService):
         :return: Найденное ключевое слово или None.
         """
         return await self.db.keywords.get_keyword_by_filter(**filter_by)
-
 
     async def update(self, keyword_id: int, data: UpdateKeyWordSchema) -> KeyWordSchema | None:
         """
@@ -84,8 +86,9 @@ class KeyWordsService(BaseService):
         updated_proposal = await self.db.keywords.update_keyword_proposal(proposal_id, data)
         return updated_proposal
 
-
-    async def approve_keyword_proposal(self, proposal_id: int, admin_comment: str | None = None, ) -> KeyWordProposalSchema | None:
+    async def approve_keyword_proposal(
+        self, proposal_id: int, admin_comment: str | None = None
+    ) -> KeyWordProposalSchema | None:
         """
         Одобряет предложение ключевого слова и создает ключевое слово, если оно не существует.
 
@@ -101,17 +104,21 @@ class KeyWordsService(BaseService):
         existing_keyword = await self.db.keywords.get_keyword_by_filter(text=proposal.text)
         if not existing_keyword:
             # Создаем новое ключевое слово
-            await self.create(proposal.text)
+            created = await self.create(proposal.text)
+            # можно при желании связать предложение с созданным словом
+            await self.update_keyword_proposal(proposal.id, {"keyword_id": created.id})
 
         # Обновляем статус предложения на "approved"
         update_data = {
             "status": "approved",
-            "admin_comment": admin_comment
+            "admin_comment": admin_comment,
         }
         updated_proposal = await self.update_keyword_proposal(proposal_id, update_data)
         return updated_proposal
 
-    async def reject_keyword_proposal(self, proposal_id: int, admin_comment: str | None = None) -> KeyWordProposalSchema | None:
+    async def reject_keyword_proposal(
+        self, proposal_id: int, admin_comment: str | None = None
+    ) -> KeyWordProposalSchema | None:
         """
         Отклоняет предложение ключевого слова.
 
@@ -126,7 +133,7 @@ class KeyWordsService(BaseService):
         # Обновляем статус предложения на "rejected"
         update_data = {
             "status": "rejected",
-            "admin_comment": admin_comment
+            "admin_comment": admin_comment,
         }
         updated_proposal = await self.update_keyword_proposal(proposal_id, update_data)
         return updated_proposal
