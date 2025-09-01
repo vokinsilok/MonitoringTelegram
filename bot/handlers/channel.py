@@ -23,7 +23,7 @@ class ChannelProposalForm(StatesGroup):
 @router.message(F.text.startswith("📢 Предложить канал"))
 async def cmd_propose_channel(message: Message, state: FSMContext):
     """Начать процесс предложения канала"""
-    await message.answer("Пожалуйста, отправьте ссылку на Telegram-канал или его @username")
+    await message.answer("📢 <b>Предложить канал</b>\n\nОтправьте ссылку на канал или его @username:")
     await state.set_state(ChannelProposalForm.waiting_for_channel)
 
 
@@ -39,12 +39,13 @@ async def cmd_propose_channel(message: Message, state: FSMContext):
         user_permissions = await UserService(db).cheek_user_permissions(user_id)
 
     if not user_permissions["is_admin"] and not user_permissions["is_operator"]:
-        await message.answer("У вас нет прав для добавления каналов.")
+        await message.answer("⚠️ <b>Недостаточно прав</b>\n\nЭта функция доступна операторам и администраторам.")
     elif not user_permissions["is_admin"]:
         await message.answer(
-            "У вас нет прав для добавления каналов. Вы можете предложить канал на добавление, и администраторы рассмотрят вашу заявку.")
+            "⚠️ У вас нет прав для прямого добавления.\n\nВы можете <b>предложить</b> канал, и администраторы рассмотрят заявку."
+        )
     else:
-        await message.answer("Пожалуйста, отправьте ссылку на Telegram-канал или его @username")
+        await message.answer("➕ <b>Добавление канала</b>\n\nОтправьте ссылку на канал или его @username:")
         await state.set_state(ChannelProposalForm.waiting_for_channel)
 
 
@@ -57,7 +58,7 @@ async def process_channel(message: Message, state: FSMContext):
     await state.update_data(channel_link=channel_link)
 
     # Запрашиваем комментарий
-    await message.answer("Вы можете добавить комментарий к вашему предложению (или отправьте 'нет' для пропуска):")
+    await message.answer("✏️ Добавьте комментарий к предложению (или отправьте 'нет' для пропуска):")
     await state.set_state(ChannelProposalForm.waiting_for_comment)
 
 
@@ -77,9 +78,10 @@ async def process_comment(message: Message, state: FSMContext):
 
     # Запрашиваем подтверждение
     await message.answer(
-        f"Вы хотите предложить канал {channel_link} для мониторинга?\n"
-        f"Комментарий: {comment if comment else 'Нет комментария'}\n"
-        f"Отправьте 'да' для подтверждения или 'нет' для отмены."
+        "🧾 <b>Подтверждение</b>\n\n" \
+        f"Канал: <code>{channel_link}</code>\n" \
+        f"Комментарий: {comment if comment else '—'}\n\n" \
+        "Отправьте 'да' для подтверждения или 'нет' для отмены."
     )
     await state.set_state(ChannelProposalForm.waiting_for_confirmation)
 
@@ -109,7 +111,7 @@ async def process_confirmation(message: Message, state: FSMContext):
                     channel_service = ChannelService(db)
                     existing_channel = await channel_service.get_channel_by_filter(invite_link=channel_link)
                     if existing_channel:
-                        await message.answer(f"Канал {channel_link} уже добавлен для мониторинга.")
+                        await message.answer(f"ℹ️ Канал <code>{channel_link}</code> уже добавлен для мониторинга.")
                     else:
                         channel_username = channel_link.lstrip("@").replace("https://t.me/", "").replace("http://t.me/", "")
                         title = channel_username if channel_username else "Unnamed Channel"
@@ -137,10 +139,10 @@ async def process_confirmation(message: Message, state: FSMContext):
 
                         await notify_admins_about_channel_proposal(message.bot, channel_proposal,
                                                                    message.from_user.username)
-                        await message.answer(f"Канал {channel_link} успешно добавлен на рассмотрение.")
+                        await message.answer("✅ <b>Заявка отправлена</b>\n\nКанал передан на рассмотрение администраторам.")
                 except Exception as e:
                     main_logger.error(f"Ошибка при добавлении канала админом: {e}")
-                    await message.answer("Произошла ошибка при добавлении канала. Пожалуйста, попробуйте позже.")
+                    await message.answer("⚠️ Произошла ошибка при добавлении. Попробуйте позже.")
             elif user_permissions["is_admin"]:
                 # Если пользователь - администратор, создаем только сам канал
                 try:
@@ -148,7 +150,7 @@ async def process_confirmation(message: Message, state: FSMContext):
                     channel_service = ChannelService(db)
                     existing_channel = await channel_service.get_channel_by_filter(invite_link=channel_link)
                     if existing_channel:
-                        await message.answer(f"Канал {channel_link} уже добавлен для мониторинга.")
+                        await message.answer(f"ℹ️ Канал <code>{channel_link}</code> уже добавлен для мониторинга.")
                     else:
                         channel_username = channel_link.lstrip("@").replace("https://t.me/", "").replace("http://t.me/", "")
                         title = channel_username if channel_username else "Unnamed Channel"
@@ -166,17 +168,16 @@ async def process_confirmation(message: Message, state: FSMContext):
                         )
                         if new_channel:
                             main_logger.info(f"Канал {channel_link} успешно добавлен администратором {telegram_id}")
-                            await message.answer(f"Канал {channel_link} успешно добавлен для мониторинга.")
+                            await message.answer("✅ Канал успешно добавлен для мониторинга.")
                         else:
-                            await message.answer("Произошла ошибка при добавлении канала. Пожалуйста, попробуйте позже.")
-
+                            await message.answer("⚠️ Произошла ошибка при добавлении. Попробуйте позже.")
                 except Exception as e:
                     main_logger.error(f"Ошибка при добавлении канала админом: {e}")
-                    await message.answer("Произошла ошибка при добавлении канала. Пожалуйста, попробуйте позже.")
+                    await message.answer("⚠️ Произошла ошибка при добавлении. Попробуйте позже.")
             else:
-                await message.answer("У вас нет прав для добавления каналов.")
+                await message.answer("⚠️ У вас нет прав для добавления каналов.")
     else:
-        await message.answer("Добавление канала отменено.")
+        await message.answer("❌ Операция отменена.")
 
     await state.clear()
 
@@ -205,11 +206,11 @@ async def notify_admins_about_channel_proposal(bot: Bot, proposal, operator_user
 
             # Формируем текст уведомления
             notification_text = (
-                f"📢 <b>Новое предложение канала</b>\n\n"
+                "📢 <b>Новое предложение канала</b>\n\n"
                 f"Канал: @{proposal.channel_username}\n"
                 f"Предложил: {operator_display}\n"
                 f"Комментарий: {proposal.comment or 'Отсутствует'}\n\n"
-                f"Пожалуйста, рассмотрите предложение."
+                "Пожалуйста, рассмотрите предложение."
             )
 
             # Создаем клавиатуру для подтверждения/отклонения
@@ -243,21 +244,19 @@ async def approve_channel_proposal(callback: CallbackQuery):
 
             if proposal:
                 await callback.message.edit_text(
-                    f"✅ Предложение канала @{proposal.channel_username} одобрено.\n"
-                    f"Канал добавлен в мониторинг."
+                    f"✅ Предложение канала @{proposal.channel_username} одобрено.\nКанал добавлен в мониторинг."
                 )
 
                 # Уведомляем оператора о подтверждении предложения
                 try:
                     await callback.bot.send_message(
                         chat_id=proposal.operator_id,
-                        text=f"✅ Ваше предложение канала @{proposal.channel_username} было одобрено администратором."
+                        text=f"✅ Ваше предложение канала @{proposal.channel_username} одобрено."
                     )
                 except Exception as e:
                     main_logger.error(f"Ошибка при отправке уведомления оператору {proposal.operator_id}: {str(e)}")
             else:
-                await callback.message.edit_text(
-                    "Не удалось обновить статус предложения. Возможно, оно уже было обработано.")
+                await callback.message.edit_text("⚠️ Не удалось обновить статус предложения. Возможно, оно уже обработано.")
     except Exception as e:
         main_logger.error(f"Ошибка при подтверждении предложения канала: {str(e)}")
         await callback.message.edit_text(f"Произошла ошибка при обработке предложения: {str(e)}")
@@ -285,13 +284,12 @@ async def reject_channel_proposal(callback: CallbackQuery):
                 try:
                     await callback.bot.send_message(
                         chat_id=proposal.operator_id,
-                        text=f"❌ Ваше предложение канала @{proposal.channel_username} было отклонено администратором."
+                        text=f"❌ Ваше предложение канала @{proposal.channel_username} отклонено."
                     )
                 except Exception as e:
                     main_logger.error(f"Ошибка при отправке уведомления оператору {proposal.operator_id}: {str(e)}")
             else:
-                await callback.message.edit_text(
-                    "Не удалось обновить статус предложения. Возможно, оно уже было обработано.")
+                await callback.message.edit_text("⚠️ Не удалось обновить статус предложения. Возможно, оно уже обработано.")
     except Exception as e:
         main_logger.error(f"Ошибка при отклонении предложения канала: {str(e)}")
         await callback.message.edit_text(f"Произошла ошибка при обработке предложения: {str(e)}")

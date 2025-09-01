@@ -17,12 +17,13 @@ def _format_requester_display(user) -> str:
     return f"<a href=\"tg://user?id={user.telegram_id}\">{visible_name}</a>"
 
 
-@router.message(F.text == "📊 Отчет")
+@router.message(F.text.in_({"📊 Отчет", "📊 Отчёт", "Отчёт", "Отчет"}))
 async def show_report(message: Message):
     text = (
-        "�? Отчет\n\n"
-        "Функция формирования отчетов находится в разработке.\n"
-        "Ожидайте обновлений."
+        "📊 <b>Отчёты</b>\n\n"
+        "Функция формирования отчётов находится в разработке.\n"
+        "Мы уже работаем над красивыми и информативными дашбордами.\n\n"
+        "🔔 <i>Следите за обновлениями!</i>"
     )
     await message.answer(text)
 
@@ -35,12 +36,12 @@ async def request_operator_access(message: Message):
             user_service = UserService(db)
             user = await user_service.get_user_by_filter(telegram_id=message.from_user.id)
             if not user:
-                await message.answer("Не удалось определить пользователя. Попробуйте /start")
+                await message.answer("❌ Не удалось определить пользователя. Попробуйте /start.")
                 return
 
             admins = await user_service.get_admins()
             if not admins:
-                await message.answer("Нет доступных администраторов. Попробуйте позже.")
+                await message.answer("⚠️ Нет доступных администраторов. Попробуйте позже.")
                 return
 
             display = _format_requester_display(user)
@@ -60,12 +61,19 @@ async def request_operator_access(message: Message):
                     main_logger.error(f"send admin op-access request error to {admin.telegram_id}: {e}")
 
         if sent:
-            await message.answer("Ваш запрос отправлен администраторам. Ожидайте решения.")
+            await message.answer(
+                "✅ <b>Запрос отправлен!</b>\n\n"
+                "Администраторы получили ваше обращение.\n"
+                "Вы получите уведомление после принятия решения."
+            )
         else:
-            await message.answer("Не удалось отправить запрос администраторам. Попробуйте позже.")
+            await message.answer(
+                "❌ <b>Не удалось отправить запрос</b>\n\n"
+                "Попробуйте позже или свяжитесь с поддержкой."
+            )
     except Exception as e:
         main_logger.error(f"request_operator_access error: {e}")
-        await message.answer("Произошла ошибка. Попробуйте позже.")
+        await message.answer("⚠️ Произошла ошибка. Попробуйте позже.")
 
 
 @router.callback_query(F.data.startswith("approve_operator:"))
@@ -95,7 +103,10 @@ async def approve_operator(callback: CallbackQuery):
             try:
                 await callback.bot.send_message(
                     chat_id=user.telegram_id,
-                    text="✅ Вам выдан доступ оператора. Перезапустите бота командой /start для обновления меню."
+                    text=(
+                        "✅ <b>Доступ оператора выдан</b>\n\n"
+                        "Перезапустите бота командой /start, чтобы обновить меню."
+                    )
                 )
             except Exception as e:
                 main_logger.error(f"notify user grant operator failed {user.telegram_id}: {e}")
@@ -105,7 +116,7 @@ async def approve_operator(callback: CallbackQuery):
         return
 
     try:
-        await callback.message.edit_text("✅ Доступ оператора выдан.")
+        await callback.message.edit_text("✅ Запрос обработан: доступ выдан.")
     except Exception:
         pass
     await callback.answer()
@@ -137,7 +148,7 @@ async def reject_operator(callback: CallbackQuery):
             try:
                 await callback.bot.send_message(
                     chat_id=user.telegram_id,
-                    text="❌ Ваш запрос на доступ оператора отклонен."
+                    text="❌ Ваш запрос на доступ оператора отклонён."
                 )
             except Exception as e:
                 main_logger.error(f"notify user reject operator failed {user.telegram_id}: {e}")
@@ -147,7 +158,7 @@ async def reject_operator(callback: CallbackQuery):
         return
 
     try:
-        await callback.message.edit_text("❌ Запрос отклонен.")
+        await callback.message.edit_text("❌ Запрос отклонён.")
     except Exception:
         pass
     await callback.answer()
@@ -156,11 +167,11 @@ async def reject_operator(callback: CallbackQuery):
 @router.message(F.text == "💬 Обратная связь")
 async def show_feedback(message: Message):
     text = (
-        "💬 Обратная связь\n\n"
+        "💬 <b>Обратная связь</b>\n\n"
         "Связь с поддержкой:\n"
-        "• Telegram: @support\n"
-        "• Email: support@example.com\n\n"
-        "Мы на связи пн-пт 10:00–19:00 (МСК)."
+        "• Telegram: <a href=\"https://t.me/support\">@support</a>\n"
+        "• Email: <code>support@example.com</code>\n\n"
+        "🕘 График: пн–пт, 10:00–19:00 (МСК)"
     )
     await message.answer(text)
 
@@ -168,11 +179,12 @@ async def show_feedback(message: Message):
 @router.message(F.text.in_({"❓О системе", "❓ О системе"}))
 async def about_system(message: Message):
     text = (
-        "❓ О системе\n\n"
-        "Система мониторинга Telegram-каналов:\n"
-        "• Добавление и модерация каналов.\n"
-        "• Поиск по ключевым словам (предложения от операторов, подтверждение админами).\n"
-        "• Роли: администратор и оператор.\n"
-        "• Уведомления и удобные панели управления прямо в чате."
+        "❓ <b>О системе</b>\n\n"
+        "Система мониторинга Telegram‑каналов помогает команде оперативно работать с контентом:\n\n"
+        "• 📢 Добавление и модерация каналов.\n"
+        "• 🔍 Поиск по ключевым словам (предложения операторов, подтверждение админами).\n"
+        "• 👤 Роли и права: администратор и оператор.\n"
+        "• 🔔 Уведомления и удобные панели управления прямо в чате.\n\n"
+        "💡 Чтобы начать — воспользуйтесь кнопками меню ниже."
     )
     await message.answer(text)
