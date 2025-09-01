@@ -37,10 +37,8 @@ def _normalize_phone(phone: str) -> str:
 
 @router.message(F.text.startswith("🔐 Добавить Telethon"))
 async def start_add_telethon(message: Message, state: FSMContext):
-    async with get_atomic_db() as db:
-        perms = await UserService(db).cheek_user_permissions(message.from_user.id)
-    if not perms.get("is_admin"):
-        await message.answer("Нет прав. Только администратор может добавлять Telethon-аккаунт.")
+    if not UserService.cheek_user_permissions_static(message.from_user.id, "admin"):
+        await message.answer("⚠️ <b>Недостаточно прав</b>\n\nЭта функция доступна только admin.")
         return
     await message.answer("Введите имя аккаунта (произвольное):")
     await state.set_state(TelethonAddForm.waiting_for_name)

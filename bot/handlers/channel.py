@@ -23,6 +23,9 @@ class ChannelProposalForm(StatesGroup):
 @router.message(F.text.startswith("📢 Предложить канал"))
 async def cmd_propose_channel(message: Message, state: FSMContext):
     """Начать процесс предложения канала"""
+    if not UserService.cheek_user_permissions_static(message.from_user.id, "operator"):
+        await message.answer("⚠️ <b>Недостаточно прав</b>\n\nЭта функция доступна только операторам.")
+        return
     await message.answer("📢 <b>Предложить канал</b>\n\nОтправьте ссылку на канал или его @username:")
     await state.set_state(ChannelProposalForm.waiting_for_channel)
 
@@ -31,6 +34,9 @@ async def cmd_propose_channel(message: Message, state: FSMContext):
 async def cmd_propose_channel(message: Message, state: FSMContext):
     """Начать процесс предложения канала"""
     user_id = message.from_user.id
+    if not UserService.cheek_user_permissions_static(message.from_user.id, "admin"):
+        await message.answer("⚠️ <b>Недостаточно прав</b>\n\nЭта функция доступна только admin.")
+        return
     if not user_id:
         await message.answer("Ошибка: не удалось получить ваш Telegram ID.")
         return

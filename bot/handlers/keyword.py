@@ -24,12 +24,18 @@ class KeywordProposalForm(StatesGroup):
 @router.message(F.text.startswith("🔍 Предложить ключевое слово"))
 async def cmd_propose_keyword(message: Message, state: FSMContext):
     """Начать процесс предложения ключевого слова"""
+    if not UserService.cheek_user_permissions_static(message.from_user.id, "operator"):
+        await message.answer("⚠️ <b>Недостаточно прав</b>\n\nЭта функция доступна только операторам.")
+        return
     await message.answer("Пожалуйста, введите ключевое слово, которое вы хотите предложить:")
     await state.set_state(KeywordProposalForm.waiting_for_keyword)
 
 @router.message(F.text.startswith("🔑 Добавить ключевое слово"))
 async def cmd_propose_keyword(message: Message, state: FSMContext):
     """Начать процесс предложения ключевого слова"""
+    if not UserService.cheek_user_permissions_static(message.from_user.id, "admin"):
+        await message.answer("⚠️ <b>Недостаточно прав</b>\n\nЭта функция доступна только admin.")
+        return
     await message.answer("Пожалуйста, введите ключевое слово, которое вы хотите предложить:")
     await state.set_state(KeywordProposalForm.waiting_for_keyword)
 

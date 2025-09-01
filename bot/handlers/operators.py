@@ -101,6 +101,9 @@ async def _render_ops_page(message_or_cb, page: int):
 
 @router.message(F.text.startswith("👥 Управление операторами"))
 async def manage_ops(message: Message):
+    if not UserService.cheek_user_permissions_static(message.from_user.id, "admin"):
+        await message.answer("⚠️ <b>Недостаточно прав</b>\n\nЭта функция доступна только admin.")
+        return
     await _render_ops_page(message, page=1)
 
 
