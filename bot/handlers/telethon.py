@@ -1,12 +1,11 @@
 from aiogram import Router, F
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
-from aiogram.types import Message
+from aiogram.types import Message, CallbackQuery
 
 from app.core.logging import main_logger
 from bot.service.user_service import UserService
 from bot.utils.depend import get_atomic_db
-from bot.utils.db_manager import DBManager
 
 from telethon import TelegramClient
 from telethon.sessions import StringSession
@@ -222,3 +221,86 @@ async def _persist_telethon_account(message: Message, name: str, api_id: int, ap
             await db.telethon.update_account(existing.id, values)
         else:
             await db.telethon.create_account(values)
+
+
+@router.callback_query(F.data.startswith("telethon_repair:"))
+async def telethon_repair(callback: CallbackQuery, state: FSMContext):
+    # Проверка прав администратора
+    async with get_atomic_db() as db:
+        perms = await UserService(db).cheek_user_permissions(callback.from_user.id)
+        if not perms.get("is_admin"):
+            await callback.answer("Нет прав", show_alert=False)
+            return
+
+    try:
+        account_id = int(callback.data.split(":")[1])
+    except Exception:
+        await callback.answer("Некорректные данные", show_alert=False)
+        return
+
+    # Загружаем аккаунт
+    async with get_atomic_db() as db:
+        account = await db.telethon.get_by_filter(id=account_id)
+    if not account:
+        await callback.answer("Аккаунт не найден", show_alert=False)
+        return
+
+    client = None
+    # Пытаемся отправить код авторизации на сохранённый телефон
+    try:
+        sess = StringSession(account.session_string or "")
+        client = TelegramClient(sess, int(account.api_id), account.api_hash)
+        client.flood_sleep_threshold = 60
+        await client.connect()
+        if await client.is_user_authorized():
+            # Уже авторизован — просто отмечаем и выходим
+            async with get_atomic_db() as db:
+                await db.telethon.update_account(account.id, {"is_authorized": True, "session_string": sess.save()})
+            await callback.message.edit_text(f"✅ Аккаунт {account.phone} уже авторизован.")
+            await callback.answer()
+            await client.disconnect()
+            return
+
+        sent = await client.send_code_request(account.phone)
+        session_string = sess.save()
+        await client.disconnect()
+
+        # Заполняем данные в состояние и переводим в ожидание кода (переиспользуем TelethonAddForm)
+        await state.update_data(
+            name=account.name,
+            api_id=int(account.api_id),
+            api_hash=account.api_hash,
+            phone=account.phone,
+            session_string=session_string,
+            phone_code_hash=getattr(sent, "phone_code_hash", None)
+        )
+        await state.set_state(TelethonAddForm.waiting_for_code)
+        await callback.message.edit_text(
+            f"Мы отправили код подтверждения для {account.phone}. Введите код (5 цифр):"
+        )
+        await callback.answer()
+    except SessionPasswordNeededError:
+        # Требуется 2FA — переводим сразу на ввод пароля
+        await state.update_data(
+            name=account.name,
+            api_id=int(account.api_id),
+            api_hash=account.api_hash,
+            phone=account.phone,
+            session_string=(account.session_string or "")
+        )
+        await state.set_state(TelethonAddForm.waiting_for_password)
+        try:
+            if client:
+                await client.disconnect()
+        except Exception:
+            pass
+        await callback.message.edit_text("Для входа требуется пароль (2FA). Введите пароль:")
+        await callback.answer()
+    except Exception as e:
+        main_logger.error(f"telethon_repair error: {e}")
+        try:
+            if client:
+                await client.disconnect()
+        except Exception:
+            pass
+        await callback.answer("Ошибка отправки кода", show_alert=False)

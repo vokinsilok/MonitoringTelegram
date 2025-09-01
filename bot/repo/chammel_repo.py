@@ -1,4 +1,5 @@
 from sqlalchemy import insert, select, update
+from sqlalchemy.sql import func
 
 from bot.models.channel import ChannelProposal, Channel
 from bot.repo.base_repo import BaseRepository
@@ -57,5 +58,25 @@ class ChannelRepository(BaseRepository):
         obj = await self.session.execute(stmt)
         return obj.scalar_one_or_none()
 
+    async def list_active_channels(self) -> list[Channel]:
+        stmt = select(Channel).where(Channel.status == "active")
+        obj = await self.session.execute(stmt)
+        return obj.scalars().all()
 
+    async def update_last_parsed(self, channel_id: int, message_id: int):
+        stmt = (
+            update(Channel)
+            .where(Channel.id == channel_id)
+            .values(last_parsed_message_id=message_id)
+        )
+        await self.session.execute(stmt)
+        await self.session.commit()
 
+    async def touch_checked(self, channel_id: int):
+        stmt = (
+            update(Channel)
+            .where(Channel.id == channel_id)
+            .values(last_checked=func.now())
+        )
+        await self.session.execute(stmt)
+        await self.session.commit()

@@ -29,3 +29,7 @@ class TelethonAccountRepository(BaseRepository):
         obj = await self.session.execute(stmt)
         return obj.scalar_one_or_none()
 
+    async def list_active_accounts(self) -> list[TelethonAccount]:
+        stmt = select(self.model).where(self.model.is_active.is_(True), self.model.is_authorized.is_(True))
+        obj = await self.session.execute(stmt)
+        return obj.scalars().all()

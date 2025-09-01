@@ -19,6 +19,7 @@ from bot.models.user_model import UserRole
 from bot.schemas.user_schema import CreateUserSchema
 from bot.service.user_service import UserService
 from bot.utils.depend import get_atomic_db
+from bot.tasks.monitoring_tasks import start_background_tasks
 
 # Инициализируем бота и диспетчер с хранилищем состояний
 storage = MemoryStorage()
@@ -109,6 +110,10 @@ async def main() -> None:
     dp.include_router(router=router_operators)
     dp.include_router(router=router_general)
     dp.include_router(router=router_telethon)
+
+    # Запускаем фоновые задачи
+    start_background_tasks(bot)
+
     main_logger.info("Starting bot")
 
     # Запускаем бота

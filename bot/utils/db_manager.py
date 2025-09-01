@@ -4,6 +4,7 @@ from bot.repo.chammel_repo import ChannelRepository
 from bot.repo.keyword_repo import KeyWordRepo
 from bot.repo.user_repo import UserRepository
 from bot.repo.telethon_repo import TelethonAccountRepository
+from bot.repo.post_repo import PostRepository
 
 
 class DBManager:
@@ -17,6 +18,7 @@ class DBManager:
         self.channel = ChannelRepository(self.session)
         self.keywords = KeyWordRepo(self.session)
         self.telethon = TelethonAccountRepository(self.session)
+        self.post = PostRepository(self.session)
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
