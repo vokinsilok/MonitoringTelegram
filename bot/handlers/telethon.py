@@ -10,7 +10,7 @@ from bot.utils.db_manager import DBManager
 
 from telethon import TelegramClient
 from telethon.sessions import StringSession
-from telethon.errors import SessionPasswordNeededError
+from telethon.errors import SessionPasswordNeededError, PhoneCodeExpiredError, PhoneCodeInvalidError
 
 router = Router()
 
@@ -85,11 +85,37 @@ async def telethon_phone(message: Message, state: FSMContext):
     api_id = data["api_id"]
     api_hash = data["api_hash"]
 
-    # Отправляем код подтверждения
+    # Пытаемся использовать уже существующую сессию из БД
+    existing_session: str | None = None
     try:
-        client = TelegramClient(StringSession(), api_id, api_hash)
+        async with get_atomic_db() as db:
+            existing = await db.telethon.get_by_filter(phone=phone)
+            if existing and existing.session_string:
+                existing_session = existing.session_string
+    except Exception:
+        existing_session = None
+
+    try:
+        base_session = StringSession(existing_session) if existing_session else StringSession()
+        client = TelegramClient(base_session, api_id, api_hash)
+        client.flood_sleep_threshold = 60
         await client.connect()
-        await client.send_code_request(phone)
+
+        # Если уже авторизованы, сразу сохраняем обновления и выходим
+        if await client.is_user_authorized():
+            session_string = base_session.save()
+            await _persist_telethon_account(message, data["name"], api_id, api_hash, phone, session_string)
+            await message.answer("✅ Аккаунт уже был авторизован. Данные обновлены.")
+            await state.clear()
+            await client.disconnect()
+            return
+
+        sent = await client.send_code_request(phone)
+        session_string = base_session.save()
+        await state.update_data(
+            session_string=session_string,
+            phone_code_hash=getattr(sent, "phone_code_hash", None)
+        )
         await client.disconnect()
         await message.answer("Мы отправили код подтверждения в Telegram. Введите код (5 цифр):")
         await state.set_state(TelethonAddForm.waiting_for_code)
@@ -102,32 +128,49 @@ async def telethon_phone(message: Message, state: FSMContext):
 @router.message(TelethonAddForm.waiting_for_code)
 async def telethon_code(message: Message, state: FSMContext):
     code = message.text.strip().replace(" ", "")
+    if not code.isdigit() or not (3 <= len(code) <= 8):
+        await message.answer("Код должен состоять из 3–8 цифр. Введите код ещё раз:")
+        return
+
     data = await state.get_data()
     name = data["name"]
     api_id = data["api_id"]
     api_hash = data["api_hash"]
     phone = data["phone"]
+    session_string = data.get("session_string")
+    phone_code_hash = data.get("phone_code_hash")
 
-    client = TelegramClient(StringSession(), api_id, api_hash)
+    sess = StringSession(session_string or '')
+    client = TelegramClient(sess, api_id, api_hash)
     try:
+        client.flood_sleep_threshold = 60
         await client.connect()
         try:
-            await client.sign_in(phone=phone, code=code)
+            if phone_code_hash:
+                await client.sign_in(phone=phone, code=code, phone_code_hash=phone_code_hash)
+            else:
+                await client.sign_in(phone=phone, code=code)
         except SessionPasswordNeededError:
-            # Нужен пароль 2FA
             await client.disconnect()
             await state.update_data(pending_code=code)
             await message.answer("Для входа требуется пароль (2FA). Введите пароль:")
             await state.set_state(TelethonAddForm.waiting_for_password)
             return
+        except PhoneCodeInvalidError:
+            await message.answer("❌ Неверный код. Попробуйте снова. Введите код:")
+            return
+        except PhoneCodeExpiredError:
+            await message.answer("⌛ Срок действия кода истёк. Отправьте номер телефона ещё раз:")
+            await state.set_state(TelethonAddForm.waiting_for_phone)
+            return
 
-        # Успешный вход, сохраняем сессию
-        session_string = client.session.save()
+        session_string = sess.save()
         await _persist_telethon_account(message, name, api_id, api_hash, phone, session_string)
         await message.answer("✅ Telethon-аккаунт добавлен и авторизован.")
+        await state.clear()
     except Exception as e:
         main_logger.error(f"telethon sign_in error: {e}")
-        await message.answer("Неверный код или ошибка авторизации. Отправьте номер телефона ещё раз:")
+        await message.answer("Ошибка авторизации. Отправьте номер телефона ещё раз:")
         await state.set_state(TelethonAddForm.waiting_for_phone)
     finally:
         await client.disconnect()
@@ -141,33 +184,29 @@ async def telethon_password(message: Message, state: FSMContext):
     api_id = data["api_id"]
     api_hash = data["api_hash"]
     phone = data["phone"]
-    code = data.get("pending_code")
+    session_string = data.get("session_string")
 
-    client = TelegramClient(StringSession(), api_id, api_hash)
+    sess = StringSession(session_string or '')
+    client = TelegramClient(sess, api_id, api_hash)
     try:
+        client.flood_sleep_threshold = 60
         await client.connect()
-        # Сначала пытаемся войти по паролю 2FA (аккаунт уже привязан к номеру)
-        await client.sign_in(phone=phone, code=code)
-    except SessionPasswordNeededError:
-        try:
-            await client.sign_in(password=password)
-            session_string = client.session.save()
-            await _persist_telethon_account(message, name, api_id, api_hash, phone, session_string)
-            await message.answer("✅ Telethon-аккаунт добавлен и авторизован.")
-        except Exception as e:
-            main_logger.error(f"telethon 2FA error: {e}")
-            await message.answer("Неверный пароль. Попробуйте ещё раз. Введите пароль 2FA:")
-            return
+        await client.sign_in(password=password)
+        session_string = sess.save()
+        await _persist_telethon_account(message, name, api_id, api_hash, phone, session_string)
+        await message.answer("✅ Telethon-аккаунт добавлен и авторизован.")
+        await state.clear()
     except Exception as e:
-        main_logger.error(f"telethon final sign_in error: {e}")
-        await message.answer("Ошибка авторизации. Начнём заново. Введите номер телефона:")
-        await state.set_state(TelethonAddForm.waiting_for_phone)
+        main_logger.error(f"telethon 2FA error: {e}")
+        await message.answer("Неверный пароль. Попробуйте ещё раз. Введите пароль 2FA:")
+        return
     finally:
         await client.disconnect()
         await state.update_data(pending_code=None)
 
 
-async def _persist_telethon_account(message: Message, name: str, api_id: int, api_hash: str, phone: str, session_string: str):
+async def _persist_telethon_account(message: Message, name: str, api_id: int, api_hash: str, phone: str,
+                                    session_string: str):
     async with get_atomic_db() as db:
         # Пишем/обновляем запись
         existing = await db.telethon.get_by_filter(phone=phone)
@@ -185,4 +224,3 @@ async def _persist_telethon_account(message: Message, name: str, api_id: int, ap
             await db.telethon.update_account(existing.id, values)
         else:
             await db.telethon.create_account(values)
-

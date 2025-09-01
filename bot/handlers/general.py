@@ -17,6 +17,16 @@ def _format_requester_display(user) -> str:
     return f"<a href=\"tg://user?id={user.telegram_id}\">{visible_name}</a>"
 
 
+@router.message(F.text == "📊 Отчет")
+async def show_report(message: Message):
+    text = (
+        "�? Отчет\n\n"
+        "Функция формирования отчетов находится в разработке.\n"
+        "Ожидайте обновлений."
+    )
+    await message.answer(text)
+
+
 @router.message(F.text == "📝 Получить доступ оператора")
 async def request_operator_access(message: Message):
     """Обычный пользователь запрашивает роль оператора: уведомляем всех админов."""
