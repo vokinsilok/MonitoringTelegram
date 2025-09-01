@@ -101,7 +101,7 @@ async def process_confirmation(message: Message, state: FSMContext):
 
         async with get_atomic_db() as db:
             user_permissions = await UserService(db).cheek_user_permissions(telegram_id)
-            if not user_permissions["is_admin"]:
+            if not user_permissions["is_operator"]:
                 await message.answer("У вас нет прав для добавления каналов.")
                 await state.clear()
                 return

@@ -60,17 +60,21 @@ async def process_confirmation(message: Message, state: FSMContext):
         data = await state.get_data()
         keyword = data['keyword']
         comment = data['comment']
+        operator_id = int(message.from_user.id) if message.from_user.id else None
 
-        data = KeyWordProposalCreateSchema(
-            keyword_id=None,
-            operator_id=message.from_user.id,
-            text=str(keyword),
-            type=KeywordType.WORD,
-            comment=comment,
-            admin_comment=None
-        )
+
         try:
             async with get_atomic_db() as db:
+                user = await UserService(db).get_user_by_filter(telegram_id=operator_id)
+                data = KeyWordProposalCreateSchema(
+                    keyword_id=None,
+                    operator_id=user.id,
+                    text=str(keyword),
+                    type=KeywordType.WORD,
+                    status="pending",
+                    comment=comment,
+                    admin_comment=None
+                )
                 keyword_service = KeyWordsService(db)
                 keyword_proposal = await keyword_service.create_keyword_proposal(data)
             if keyword_proposal:
@@ -124,8 +128,8 @@ async def approve_keyword_proposal(callback: CallbackQuery):
 
         async with get_atomic_db() as db:
             # Обновляем статус предложения
-            proposal = await KeyWordsService(db).approve_keyword_proposal(proposal_id, admin_comment="Approved by admin")
-
+            proposal = await KeyWordsService(db).approve_keyword_proposal(proposal_id,
+                                                                          admin_comment="Approved by admin")
 
             if proposal:
                 await callback.message.edit_text(

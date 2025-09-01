@@ -26,3 +26,6 @@ class UserService(BaseService):
     async def get_admins(self) -> List[User]:
         """Получить список всех администраторов"""
         return await self.db.user.get_admins()
+
+    async def get_user_by_filter(self, **filters) -> UserSchema:
+        return await self.db.user.get_user_by_filter(**filters)

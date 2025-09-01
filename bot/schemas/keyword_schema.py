@@ -26,6 +26,7 @@ class KeyWordProposalCreateSchema(BaseModel):
     operator_id: int
     text: str
     type: KeywordType
+    status: str
     comment: str | None = None
     admin_comment: str | None = None
 
