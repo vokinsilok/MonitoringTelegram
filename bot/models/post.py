@@ -72,3 +72,20 @@ class PostProcessing(Base):
     # Отношения
     post = relationship("Post", back_populates="processing_records")
     operator = relationship("User", back_populates="processed_posts")
+
+
+class Postponed(Base):
+    """
+    Модель для хранения отложенных постов, которые нужно будет обработать позже.
+    """
+    __tablename__ = "postponed"
+
+    id = Column(Integer, primary_key=True, index=True)
+    post_id = Column(Integer, ForeignKey("post.id"), nullable=False)
+    operator_id = Column(Integer, ForeignKey("user.id"), nullable=False)
+    at_postpone = Column(DateTime(timezone=True), nullable=False)  # Время отложения
+    reason = Column(Text, nullable=True)  # Причина отложения
+
+    # Отношения
+    post = relationship("Post")
+    operator = relationship("User", back_populates="postponed_posts")
