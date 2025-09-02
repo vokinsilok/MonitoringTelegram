@@ -117,11 +117,15 @@ def get_main_keyboard(is_admin: bool = False, is_operator: bool = False) -> Repl
         add_keyword_button = KeyboardButton(text="🔑 Добавить ключевое слово")
         manage_operators_button = KeyboardButton(text="👥 Управление операторами")
         add_telethon_button = KeyboardButton(text="🔐 Добавить Telethon")
-        
+        # Новые кнопки пакетной загрузки
+        bulk_channels_button = KeyboardButton(text="📥 Добавить каналы")
+        bulk_keywords_button = KeyboardButton(text="📥 Добавить ключевые слова")
+
         # Создаем массив кнопок для клавиатуры
         keyboard_buttons = [
             [add_channel_button, add_keyword_button],
             [manage_operators_button, add_telethon_button],
+            [bulk_channels_button, bulk_keywords_button],
             [report_button]
         ]
     elif is_operator:

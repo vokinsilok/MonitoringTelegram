@@ -13,6 +13,7 @@ from bot.handlers.operators import router as router_operators
 from bot.handlers.general import router as router_general
 from bot.handlers.telethon import router as router_telethon
 from bot.handlers.post_processing import router as router_post_processing
+from bot.handlers.bulk_import import router as router_bulk_import
 from app.core.config import settings
 from app.core.logging import main_logger
 from bot.keyboards.keyboards import get_main_keyboard
@@ -111,7 +112,8 @@ async def main() -> None:
     dp.include_router(router=router_operators)
     dp.include_router(router=router_general)
     dp.include_router(router=router_telethon)
-    dp.include_router(router=router_post_processing)
+    dp.include_router(router_post_processing)
+    dp.include_router(router=router_bulk_import)
 
     # Запускаем фоновые задачи
     start_background_tasks(bot)
