@@ -15,8 +15,8 @@ class Settings(BaseSettings):
     SUPER_ADMIN: int
 
     # Интервалы планировщика (в секундах)
-    PARSE_TASK_INTERVAL_SEC: int = 60
-    NOTIFY_TASK_INTERVAL_SEC: int = 120
+    PARSE_TASK_INTERVAL_SEC: int = 10
+    NOTIFY_TASK_INTERVAL_SEC: int = 10
 
     # Окно актуальности постов для уведомлений (в часах)
     NOTIFY_LOOKBACK_HOURS: int = 24

@@ -1,6 +1,7 @@
 import asyncio
 import re
 from typing import List, Set
+from html import escape
 
 from telethon import TelegramClient
 from telethon.sessions import StringSession
@@ -16,27 +17,29 @@ from bot.utils.depend import get_atomic_db
 
 
 def _compile_keyword_patterns(keywords) -> List[tuple[int, str, re.Pattern]]:
+    """Готовим паттерны в нижнем регистре, чтобы сравнивать с text.lower()."""
     patterns: List[tuple[int, str, re.Pattern]] = []
     for kw in keywords:
         if not kw.is_active:
             continue
         t = (kw.type or KeywordType.WORD.value)
-        text = kw.text or ""
-        if not text:
+        raw_text = kw.text or ""
+        if not raw_text:
             continue
+        text_l = raw_text.lower()
         if t == KeywordType.WORD.value:
-            pat = re.compile(rf"\b{re.escape(text)}\b", re.IGNORECASE)
+            pat = re.compile(rf"\b{re.escape(text_l)}\b")
         elif t == KeywordType.PHRASE.value:
-            pat = re.compile(re.escape(text), re.IGNORECASE)
+            pat = re.compile(re.escape(text_l))
         elif t == KeywordType.REGEX.value:
             try:
-                pat = re.compile(text, re.IGNORECASE)
+                pat = re.compile(text_l)
             except re.error:
-                main_logger.error(f"Invalid regex keyword #{kw.id}: {text}")
+                main_logger.error(f"Invalid regex keyword #{kw.id}: {raw_text}")
                 continue
         else:
-            pat = re.compile(re.escape(text), re.IGNORECASE)
-        patterns.append((kw.id, text, pat))
+            pat = re.compile(re.escape(text_l))
+        patterns.append((kw.id, text_l, pat))
     return patterns
 
 
@@ -61,7 +64,6 @@ async def _select_telethon_account():
 
 def _extract_text_from_message(msg) -> str:
     try:
-        # Telethon Message supports .message or .text
         return (msg.message or msg.raw_text or "")
     except Exception:
         return ""
@@ -203,12 +205,10 @@ async def parse_posts_loop(bot):
 
                     async for msg in working_client.iter_messages(entity, limit=200, min_id=min_id):
                         text = _extract_text_from_message(msg)
-                        if not text:
-                            # Если нет текста — можем проверять подписи/медиа при желании
-                            text = ""
+                        text_lower = text.lower() if text else ""
                         matched_kw_ids: List[int] = []
                         for kw_id, _, pat in patterns:
-                            if pat.search(text):
+                            if pat.search(text_lower):
                                 matched_kw_ids.append(kw_id)
                         if not matched_kw_ids:
                             max_processed_id = max(max_processed_id, msg.id)
@@ -292,21 +292,35 @@ async def notify_loop(bot):
                         continue
                     post = pp.post
                     ch = post.channel if hasattr(post, "channel") else None
-                    title = getattr(ch, "title", "Канал")
+                    title = escape(getattr(ch, "title", "Канал") or "Канал")
                     text = post.text or "(без текста)"
                     preview = (text[:400] + "…") if len(text) > 400 else text
+                    preview = escape(preview)
                     url = post.url or ""
+
+                    # Собираем найденные ключевые слова
+                    kw_texts = []
+                    try:
+                        for mk in getattr(post, "matched_keywords", []) or []:
+                            if getattr(mk, "keyword", None) and mk.keyword.text:
+                                t = mk.keyword.text
+                                if t not in kw_texts:
+                                    kw_texts.append(t)
+                    except Exception:
+                        pass
+                    kw_line = ("\n<b>Ключевые слова:</b> " + ", ".join(f"<code>{escape(k)}</code>" for k in kw_texts)) if kw_texts else ""
+
                     msg_text = (
-                        f"🔍 Найден пост по ключевым словам\n\n"
-                        f"Канал: {title}\n"
-                        f"Дата: {post.published_at:%Y-%m-%d %H:%M:%S}\n"
-                        f"Ссылка: {url}\n\n"
-                        f"Текст:\n{preview}"
+                        f"🔍 <b>Найден пост по ключевым словам</b>\n\n"
+                        f"📢 <b>Канал:</b> {title}\n"
+                        f"🕒 <b>Дата:</b> {post.published_at:%Y-%m-%d %H:%M:%S}\n"
+                        f"🔗 <b>Ссылка:</b> {escape(url)}\n"
+                        f"{kw_line}\n\n"
+                        f"<b>Текст:</b>\n{preview}"
                     )
                     kb = get_post_keyboard(pp.id, post.id, url)
                     try:
                         sent = await bot.send_message(chat_id=operator.telegram_id, text=msg_text, reply_markup=kb, disable_web_page_preview=True)
-                        # Сохраняем метаданные отправленного уведомления
                         await db.post.update_processing_notify_meta(pp.id, operator.telegram_id, sent.message_id)
                         notified.add(pp.id)
                     except Exception as e:

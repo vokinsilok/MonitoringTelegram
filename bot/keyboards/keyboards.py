@@ -15,29 +15,28 @@ def get_post_keyboard(pp_id: int, post_id: int, post_url: str) -> InlineKeyboard
         InlineKeyboardMarkup: Клавиатура с кнопками для поста
     """
     # Кнопка для перехода к первоисточнику
-    source_button = InlineKeyboardButton(text="Перейти к первоисточнику", url=post_url)
-    
+    source_button = InlineKeyboardButton(text="🔗 Первоисточник", url=post_url)
+
     # Кнопка для показа полного поста
     show_full_button = InlineKeyboardButton(
-        text="Показать полностью", 
+        text="📄 Показать полностью",
         callback_data=f"show_full:{post_id}"
     )
     
     # Кнопки для установки статуса
     processed_button = InlineKeyboardButton(
-        text="Обработано", 
+        text="✅ Обработать",
         callback_data=f"processed:{pp_id}"
     )
     
     postponed_button = InlineKeyboardButton(
-        text="Отложено", 
+        text="🗓 Отложить",
         callback_data=f"postponed:{pp_id}"
     )
     
     # Создаем клавиатуру с обязательным полем inline_keyboard
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [source_button],
-        [show_full_button],
+        [source_button, show_full_button],
         [processed_button, postponed_button]
     ])
     

@@ -52,7 +52,12 @@ class PostRepository(BaseRepository):
         cutoff = datetime.utcnow() - timedelta(hours=within_hours)
         stmt = (
             select(PostProcessing)
-            .options(selectinload(PostProcessing.post).selectinload(Post.channel))
+            .options(
+                selectinload(PostProcessing.post).selectinload(Post.channel),
+                selectinload(PostProcessing.post)
+                    .selectinload(Post.matched_keywords)
+                    .selectinload(PostKeywordMatch.keyword),
+            )
             .where(PostProcessing.status == PostStatus.PENDING.value)
             .where(PostProcessing.processed_at.is_(None))
             .where(Post.published_at >= cutoff)

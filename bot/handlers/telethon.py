@@ -36,7 +36,7 @@ def _normalize_phone(phone: str) -> str:
 
 @router.message(F.text.startswith("🔐 Добавить Telethon"))
 async def start_add_telethon(message: Message, state: FSMContext):
-    if not UserService.cheek_user_permissions_static(message.from_user.id, "admin"):
+    if not await UserService.cheek_user_permissions_static(message.from_user.id, "admin"):
         await message.answer("⚠️ <b>Недостаточно прав</b>\n\nЭта функция доступна только admin.")
         return
     await message.answer("Введите имя аккаунта (произвольное):")
