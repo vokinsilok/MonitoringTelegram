@@ -1,18 +1,14 @@
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery, BufferedInputFile
 from io import BytesIO
-
+from docx import Document as DocxDocument
 from app.core.logging import main_logger
 from bot.keyboards.keyboards import get_operator_access_request_keyboard
 from bot.service.user_service import UserService
 from bot.utils.depend import get_atomic_db
 from bot.models.post import PostStatus
 
-# Для генерации .docx отчёта
-try:
-    from docx import Document as DocxDocument  # type: ignore
-except Exception:  # библиотека может быть не установлена в рантайме
-    DocxDocument = None  # type: ignore
+
 
 router = Router()
 

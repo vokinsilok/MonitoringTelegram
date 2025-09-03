@@ -36,24 +36,6 @@ async def command_start_handler(message: Message) -> None:
     Обработчик команды /start.
     Приветствует пользователя и проверяет его роль.
     """
-    # if settings.SUPER_ADMIN == message.from_user.id:
-    #     async with get_atomic_db() as db:
-    #         user = await UserService(db).get_or_create_user(message.from_user.id, CreateUserSchema(
-    #             telegram_id=message.from_user.id,
-    #             username=message.from_user.username if message.from_user.username else "",
-    #             first_name=message.from_user.first_name if message.from_user.first_name else "",
-    #             last_name=message.from_user.last_name if message.from_user.last_name else "",
-    #             role=UserRole.USER.value,
-    #             is_active=True,
-    #             is_admin=False,
-    #             is_operator=False
-    #         ))
-    #     await message.answer(
-    #         f"Здравствуйте, {user.first_name}! Я ваш помошник в мониторинга Telegram-каналов.\n"
-    #         f"Ваша роль - СУПЕР АДМИН.",
-    #         reply_markup=get_main_keyboard()
-    #     )
-
     async with get_atomic_db() as db:
         user = await UserService(db).get_or_create_user(message.from_user.id, CreateUserSchema(
             telegram_id=message.from_user.id,

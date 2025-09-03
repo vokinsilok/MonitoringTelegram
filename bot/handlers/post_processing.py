@@ -91,13 +91,15 @@ async def cb_processed(callback: CallbackQuery):
             return
         post_id = updated.post_id
 
-    # Удаляем сообщения у остальных и массово проставляем статус
+    # Удаляем сообщения у остальных
     await _cleanup_other_notifications(callback.bot, post_id, pp_id)
+
+    # Всем остальным по этому посту проставляем IGNORED
     async with get_atomic_db() as db:
         try:
-            await db.post.bulk_update_status_for_post(post_id, PostStatus.PROCESSED.value, exclude_pp_id=pp_id)
+            await db.post.bulk_update_status_for_post(post_id, PostStatus.IGNORED.value, exclude_pp_id=pp_id)
         except Exception as e:
-            main_logger.error(f"bulk update status failed: {e}")
+            main_logger.error(f"bulk update status to IGNORED failed: {e}")
 
     # Подтверждаем действие пользователю
     try:
@@ -122,12 +124,15 @@ async def cb_postponed(callback: CallbackQuery):
             return
         post_id = updated.post_id
 
+    # Удаляем сообщения у остальных
     await _cleanup_other_notifications(callback.bot, post_id, pp_id)
+
+    # Всем остальным по этому посту проставляем IGНОRED
     async with get_atomic_db() as db:
         try:
-            await db.post.bulk_update_status_for_post(post_id, PostStatus.POSTPONED.value, exclude_pp_id=pp_id)
+            await db.post.bulk_update_status_for_post(post_id, PostStatus.IGNORED.value, exclude_pp_id=pp_id)
         except Exception as e:
-            main_logger.error(f"bulk update status failed: {e}")
+            main_logger.error(f"bulk update status to IGNORED failed: {e}")
 
     try:
         await callback.message.edit_text("⏸ Отложено")

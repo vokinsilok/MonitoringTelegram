@@ -12,6 +12,8 @@ class PostStatus(str, Enum):
     PENDING = "pending"  # Ожидает обработки
     PROCESSED = "processed"  # Обработан
     POSTPONED = "postponed"  # Отложен
+    IGNORED = "ignored"  # Игнорирован
+     # Отменен
 
 
 class Post(Base):
