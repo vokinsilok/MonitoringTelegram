@@ -1,7 +1,6 @@
 from enum import Enum
-from typing import List, Optional
 
-from sqlalchemy import Boolean, Column, Integer, String, BigInteger
+from sqlalchemy import Boolean, String, BigInteger
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 
 from app.db.database import Base
@@ -35,6 +34,7 @@ class User(Base):
     proposed_channels = relationship("ChannelProposal", back_populates="operator")
     proposed_keywords = relationship("KeywordProposal", back_populates="operator")
     processed_posts = relationship("PostProcessing", back_populates="operator")
+    postponed_posts = relationship("Postponed", back_populates="operator")
 
 
     @property
@@ -44,7 +44,7 @@ class User(Base):
 
     @property
     def is_operator_role(self) -> bool:
-        """Проверка, является ли пользо��атель оператором по роли"""
+        """Проверка, является ли пользователь оператором по роли"""
         return self.role == UserRole.OPERATOR.value
 
     @property

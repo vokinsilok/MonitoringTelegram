@@ -1,4 +1,4 @@
-from aiogram import Router, F, Bot
+from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery, BufferedInputFile
 from io import BytesIO
 
@@ -10,9 +10,9 @@ from bot.models.post import PostStatus
 
 # Для генерации .docx отчёта
 try:
-    from docx import Document  # type: ignore
+    from docx import Document as DocxDocument  # type: ignore
 except Exception:  # библиотека может быть не установлена в рантайме
-    Document = None  # type: ignore
+    DocxDocument = None  # type: ignore
 
 router = Router()
 
@@ -68,7 +68,7 @@ async def show_report(message: Message):
         await message.answer(text, disable_web_page_preview=True)
 
         # Генерация подробного отчёта DOCX (если доступна библиотека)
-        if Document is None:
+        if DocxDocument is None:
             await message.answer("⚠️ Подробный .docx отчёт недоступен (библиотека python-docx не установлена).")
             return
 
@@ -76,7 +76,7 @@ async def show_report(message: Message):
         async with get_atomic_db() as db:
             posts = await db.post.get_recent_matched_posts(within_hours)
 
-        doc = Document()
+        doc = DocxDocument()
         doc.add_heading("Отчёт по мониторингу Telegram", level=0)
         doc.add_paragraph(f"Период: последние {within_hours} ч.")
         doc.add_paragraph("")
