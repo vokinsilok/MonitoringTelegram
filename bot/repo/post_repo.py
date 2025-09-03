@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
-from sqlalchemy import insert, select, and_, update
+from sqlalchemy import insert, select, and_, update, func, distinct
 from sqlalchemy.orm import selectinload
 
 from bot.models.post import Post, PostKeywordMatch, PostProcessing, PostStatus
@@ -114,3 +114,54 @@ class PostRepository(BaseRepository):
         stmt = stmt.values(status=new_status, processed_at=datetime.utcnow())
         await self.session.execute(stmt)
         await self.session.commit()
+
+    # -------- Методы для отчётов --------
+    async def count_distinct_posts_with_matches(self, within_hours: Optional[int] = None) -> int:
+        stmt = select(func.count(distinct(Post.id))).select_from(Post).join(PostKeywordMatch, PostKeywordMatch.post_id == Post.id)
+        if within_hours is not None:
+            cutoff = datetime.utcnow() - timedelta(hours=within_hours)
+            stmt = stmt.where(Post.published_at >= cutoff)
+        res = await self.session.execute(stmt)
+        return int(res.scalar() or 0)
+
+    async def count_processing_by_status(self, status: str, within_hours: Optional[int] = None) -> int:
+        stmt = select(func.count()).select_from(PostProcessing).join(Post, Post.id == PostProcessing.post_id)
+        stmt = stmt.where(PostProcessing.status == status)
+        if within_hours is not None:
+            cutoff = datetime.utcnow() - timedelta(hours=within_hours)
+            stmt = stmt.where(Post.published_at >= cutoff)
+        res = await self.session.execute(stmt)
+        return int(res.scalar() or 0)
+
+    async def get_operator_stats(self, within_hours: Optional[int] = None) -> List[Tuple[int, int, int]]:
+        """
+        Возвращает список кортежей (operator_id, processed_count, postponed_count)
+        """
+        base = select(
+            PostProcessing.operator_id,
+            func.sum(func.case((PostProcessing.status == PostStatus.PROCESSED.value, 1), else_=0)).label("processed"),
+            func.sum(func.case((PostProcessing.status == PostStatus.POSTPONED.value, 1), else_=0)).label("postponed"),
+        ).select_from(PostProcessing).join(Post, Post.id == PostProcessing.post_id)
+        if within_hours is not None:
+            cutoff = datetime.utcnow() - timedelta(hours=within_hours)
+            base = base.where(Post.published_at >= cutoff)
+        base = base.group_by(PostProcessing.operator_id)
+        res = await self.session.execute(base)
+        rows = res.all() or []
+        return [(int(r[0]), int(r[1] or 0), int(r[2] or 0)) for r in rows]
+
+    async def get_recent_matched_posts(self, within_hours: int = 24) -> List[Post]:
+        cutoff = datetime.utcnow() - timedelta(hours=within_hours)
+        stmt = (
+            select(Post)
+            .join(PostKeywordMatch, PostKeywordMatch.post_id == Post.id)
+            .where(Post.published_at >= cutoff)
+            .options(
+                selectinload(Post.channel),
+                selectinload(Post.matched_keywords).selectinload(PostKeywordMatch.keyword),
+            )
+            .order_by(Post.published_at.desc())
+            .limit(500)
+        )
+        res = await self.session.execute(stmt)
+        return res.unique().scalars().all()

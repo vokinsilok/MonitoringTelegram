@@ -80,3 +80,9 @@ class ChannelRepository(BaseRepository):
         )
         await self.session.execute(stmt)
         await self.session.commit()
+
+    async def count_channels(self) -> int:
+        """Общее количество каналов в системе."""
+        stmt = select(func.count()).select_from(Channel)
+        obj = await self.session.execute(stmt)
+        return int(obj.scalar() or 0)

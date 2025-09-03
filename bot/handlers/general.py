@@ -1,10 +1,18 @@
 from aiogram import Router, F, Bot
-from aiogram.types import Message, CallbackQuery
+from aiogram.types import Message, CallbackQuery, BufferedInputFile
+from io import BytesIO
 
 from app.core.logging import main_logger
 from bot.keyboards.keyboards import get_operator_access_request_keyboard
 from bot.service.user_service import UserService
 from bot.utils.depend import get_atomic_db
+from bot.models.post import PostStatus
+
+# Для генерации .docx отчёта
+try:
+    from docx import Document  # type: ignore
+except Exception:  # библиотека может быть не установлена в рантайме
+    Document = None  # type: ignore
 
 router = Router()
 
@@ -19,13 +27,112 @@ def _format_requester_display(user) -> str:
 
 @router.message(F.text.in_({"📊 Отчет", "📊 Отчёт", "Отчёт", "Отчет"}))
 async def show_report(message: Message):
-    text = (
-        "📊 <b>Отчёты</b>\n\n"
-        "Функция формирования отчётов находится в разработке.\n"
-        "Мы уже работаем над красивыми и информативными дашбордами.\n\n"
-        "🔔 <i>Следите за обновлениями!</i>"
-    )
-    await message.answer(text)
+    # Параметры окна отчёта (можно вынести в конфиг)
+    within_hours = 24
+    try:
+        async with get_atomic_db() as db:
+            total_channels = await db.channel.count_channels()
+            total_keywords = len(await db.keywords.get_all_keywords())
+            total_matched_posts = await db.post.count_distinct_posts_with_matches(within_hours)
+            processed = await db.post.count_processing_by_status(PostStatus.PROCESSED.value, within_hours)
+            postponed = await db.post.count_processing_by_status(PostStatus.POSTPONED.value, within_hours)
+            pending = await db.post.count_processing_by_status(PostStatus.PENDING.value, within_hours)
+
+            # Статистика по операторам
+            op_stats_raw = await db.post.get_operator_stats(within_hours)
+            op_lines = []
+            for op_id, proc_cnt, postp_cnt in op_stats_raw:
+                user = await db.user.get_user_by_filter(id=op_id)
+                if user and getattr(user, "username", None):
+                    display = f"@{user.username}"
+                elif user:
+                    name_parts = [p for p in [getattr(user, 'first_name', None), getattr(user, 'last_name', None)] if p]
+                    visible = " ".join(name_parts) if name_parts else str(user.telegram_id)
+                    display = f"<a href=\"tg://user?id={user.telegram_id}\">{visible}</a>"
+                else:
+                    display = "неизвестно"
+                op_lines.append(f"• {display}: <b>{proc_cnt}</b> разобранных, <b>{postp_cnt}</b> отложенных")
+
+        # Красивый текст отчёта в сообщении
+        text = (
+            "📊 <b>Отчёт</b> (за последние 24 часа)\n\n"
+            f"1. Всего каналов: <b>{total_channels}</b>\n"
+            f"2. Всего ключевых слов: <b>{total_keywords}</b>\n"
+            f"3. Найдено постов по ключевым словам: <b>{total_matched_posts}</b>\n"
+            f"4. Разобрано: <b>{processed}</b>\n"
+            f"5. Отложенно: <b>{postponed}</b>\n"
+            f"6. Ожидающие разбора: <b>{pending}</b>\n\n"
+            "👤 <b>Операторы, разбиравшие инциденты:</b>\n"
+            + ("\n".join(op_lines) if op_lines else "—")
+        )
+        await message.answer(text, disable_web_page_preview=True)
+
+        # Генерация подробного отчёта DOCX (если доступна библиотека)
+        if Document is None:
+            await message.answer("⚠️ Подробный .docx отчёт недоступен (библиотека python-docx не установлена).")
+            return
+
+        # Загружаем последние посты с совпадениями
+        async with get_atomic_db() as db:
+            posts = await db.post.get_recent_matched_posts(within_hours)
+
+        doc = Document()
+        doc.add_heading("Отчёт по мониторингу Telegram", level=0)
+        doc.add_paragraph(f"Период: последние {within_hours} ч.")
+        doc.add_paragraph("")
+        doc.add_paragraph(f"Всего каналов: {total_channels}")
+        doc.add_paragraph(f"Всего ключевых слов: {total_keywords}")
+        doc.add_paragraph(f"Найдено постов по ключевым словам: {total_matched_posts}")
+        doc.add_paragraph(f"Разобрано: {processed}")
+        doc.add_paragraph(f"Отложенно: {postponed}")
+        doc.add_paragraph(f"Ожидающие разбора: {pending}")
+
+        doc.add_heading("Операторы", level=1)
+        if op_lines:
+            for line in op_lines:
+                # Уберём HTML из docx-версии
+                plain = (
+                    line.replace("<b>", "").replace("</b>", "")
+                        .replace("<a href=\"tg://user?id=", "").replace("\">", " ")
+                        .replace("</a>", "")
+                )
+                doc.add_paragraph(plain, style="List Bullet")
+        else:
+            doc.add_paragraph("—")
+
+        doc.add_heading("Подробные посты", level=1)
+        for p in posts:
+            ch_title = getattr(getattr(p, "channel", None), "title", "Канал") or "Канал"
+            doc.add_heading(ch_title, level=2)
+            doc.add_paragraph(f"Дата: {getattr(p, 'published_at', '')}")
+            if getattr(p, "url", None):
+                doc.add_paragraph(f"Ссылка: {p.url}")
+            # Ключевые слова
+            kw_texts = []
+            try:
+                for mk in getattr(p, "matched_keywords", []) or []:
+                    if getattr(mk, "keyword", None) and mk.keyword.text:
+                        if mk.keyword.text not in kw_texts:
+                            kw_texts.append(mk.keyword.text)
+            except Exception:
+                pass
+            if kw_texts:
+                doc.add_paragraph("Ключевые слова: " + ", ".join(kw_texts))
+            # Текст поста
+            preview = (p.text or "").strip()
+            doc.add_paragraph(preview if preview else "(без текста)")
+            doc.add_paragraph("")
+
+        bio = BytesIO()
+        doc.save(bio)
+        bio.seek(0)
+        fname = f"report_{within_hours}h.docx"
+        file = BufferedInputFile(bio.read(), filename=fname)
+        await message.answer_document(file, caption="Подробный отчёт")
+
+    except Exception as e:
+        main_logger.error(f"show_report error: {e}")
+        await message.answer("⚠️ Не удалось сформировать отчёт. Попробуйте позже.")
 
 
 @router.message(F.text == "📝 Получить доступ оператора")
