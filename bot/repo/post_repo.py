@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 from typing import List, Optional, Tuple
 
-from sqlalchemy import insert, select, and_, update, func, distinct
+from sqlalchemy import insert, select, and_, update, func, distinct, case
 from sqlalchemy.orm import selectinload
 
 from bot.models.post import Post, PostKeywordMatch, PostProcessing, PostStatus
@@ -139,8 +139,8 @@ class PostRepository(BaseRepository):
         """
         base = select(
             PostProcessing.operator_id,
-            func.sum(func.case((PostProcessing.status == PostStatus.PROCESSED.value, 1), else_=0)).label("processed"),
-            func.sum(func.case((PostProcessing.status == PostStatus.POSTPONED.value, 1), else_=0)).label("postponed"),
+            func.sum(case((PostProcessing.status == PostStatus.PROCESSED.value, 1), else_=0)).label("processed"),
+            func.sum(case((PostProcessing.status == PostStatus.POSTPONED.value, 1), else_=0)).label("postponed"),
         ).select_from(PostProcessing).join(Post, Post.id == PostProcessing.post_id)
         if within_hours is not None:
             cutoff = datetime.utcnow() - timedelta(hours=within_hours)
