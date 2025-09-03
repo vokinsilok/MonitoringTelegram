@@ -9,6 +9,7 @@ from bot.utils.depend import get_atomic_db
 from bot.models.post import PostStatus
 from bot.models.user_model import Language, TimeZone
 from bot.utils.time_utils import format_dt
+from bot.utils.i18n import t
 
 
 
@@ -23,29 +24,53 @@ def _format_requester_display(user) -> str:
     return f"<a href=\"tg://user?id={user.telegram_id}\">{visible_name}</a>"
 
 
-def _settings_keyboard(cur_lang: str | None, cur_tz: str | None) -> InlineKeyboardMarkup:
-    cur_lang = (cur_lang or Language.RU.value).lower()
+# ---------- Настройки: helpers ----------
+
+def _settings_main_text(lang: str, tz: str) -> str:
+    return (
+        f"{t(lang, 'settings_title')}\n\n"
+        f"{t(lang, 'settings_lang', lang=lang.upper())}\n"
+        f"{t(lang, 'settings_tz', tz=tz)}\n\n"
+        f"{t(lang, 'settings_main')}"
+    )
+
+
+def _settings_main_keyboard(lang: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=t(lang, 'btn_lang'), callback_data="open_lang")],
+        [InlineKeyboardButton(text=t(lang, 'btn_tz'), callback_data="open_tz")],
+    ])
+
+
+def _lang_keyboard(cur_lang: str) -> InlineKeyboardMarkup:
+    cur = (cur_lang or Language.RU.value).lower()
+    def mark(v: str) -> str:
+        return ("✓ " + v.upper()) if v.lower() == cur.lower() else v.upper()
+    row = [
+        InlineKeyboardButton(text=mark("ru"), callback_data="set_lang:ru"),
+        InlineKeyboardButton(text=mark("en"), callback_data="set_lang:en"),
+        InlineKeyboardButton(text=mark("es"), callback_data="set_lang:es"),
+        InlineKeyboardButton(text=mark("fr"), callback_data="set_lang:fr"),
+    ]
+    return InlineKeyboardMarkup(inline_keyboard=[row, [InlineKeyboardButton(text=t(cur_lang, 'back'), callback_data="settings_back")]])
+
+
+def _tz_keyboard(cur_lang: str, cur_tz: str) -> InlineKeyboardMarkup:
     cur_tz = (cur_tz or TimeZone.GMT.value).upper()
-    def mark(v: str, cur: str) -> str:
-        return ("✓ " + v) if v.lower() == cur.lower() else v
-    langs = [
-        InlineKeyboardButton(text=mark("RU", cur_lang), callback_data="set_lang:ru"),
-        InlineKeyboardButton(text=mark("EN", cur_lang), callback_data="set_lang:en"),
-        InlineKeyboardButton(text=mark("ES", cur_lang), callback_data="set_lang:es"),
-        InlineKeyboardButton(text=mark("FR", cur_lang), callback_data="set_lang:fr"),
+    def mark(v: str) -> str:
+        return ("✓ " + v) if v.upper() == cur_tz else v
+    row1 = [
+        InlineKeyboardButton(text=mark("GMT"), callback_data="set_tz:GMT"),
+        InlineKeyboardButton(text=mark("UTC"), callback_data="set_tz:UTC"),
+        InlineKeyboardButton(text=mark("MSK"), callback_data="set_tz:MSK"),
     ]
-    tzs_row1 = [
-        InlineKeyboardButton(text=mark("GMT", cur_tz), callback_data="set_tz:GMT"),
-        InlineKeyboardButton(text=mark("UTC", cur_tz), callback_data="set_tz:UTC"),
-        InlineKeyboardButton(text=mark("MSK", cur_tz), callback_data="set_tz:MSK"),
+    row2 = [
+        InlineKeyboardButton(text=mark("CET"), callback_data="set_tz:CET"),
+        InlineKeyboardButton(text=mark("EST"), callback_data="set_tz:EST"),
+        InlineKeyboardButton(text=mark("PST"), callback_data="set_tz:PST"),
+        InlineKeyboardButton(text=mark("IST"), callback_data="set_tz:IST"),
     ]
-    tzs_row2 = [
-        InlineKeyboardButton(text=mark("CET", cur_tz), callback_data="set_tz:CET"),
-        InlineKeyboardButton(text=mark("EST", cur_tz), callback_data="set_tz:EST"),
-        InlineKeyboardButton(text=mark("PST", cur_tz), callback_data="set_tz:PST"),
-        InlineKeyboardButton(text=mark("IST", cur_tz), callback_data="set_tz:IST"),
-    ]
-    return InlineKeyboardMarkup(inline_keyboard=[langs, tzs_row1, tzs_row2])
+    return InlineKeyboardMarkup(inline_keyboard=[row1, row2, [InlineKeyboardButton(text=t(cur_lang, 'back'), callback_data="settings_back")]])
 
 
 @router.message(F.text.in_({"⚙️ Настройки", "⚙️ Настройки"}))
@@ -57,23 +82,73 @@ async def show_settings(message: Message):
                 await message.answer("❌ Пользователь не найден.")
                 return
             st = await db.user.get_or_create_settings(user.id)
-            text = (
-                "⚙️ <b>Настройки</b>\n\n"
-                f"Язык интерфейса: <b>{st.language.upper()}</b>\n"
-                f"Часовой пояс: <b>{st.time_zone}</b>\n\n"
-                "Выберите новые значения ниже."
-            )
-            kb = _settings_keyboard(st.language, st.time_zone)
-            await message.answer(text, reply_markup=kb)
+            lang = st.language or Language.RU.value
+            tz = st.time_zone or TimeZone.GMT.value
+            await message.answer(_settings_main_text(lang, tz), reply_markup=_settings_main_keyboard(lang))
     except Exception as e:
         main_logger.error(f"show_settings error: {e}")
         await message.answer("⚠️ Ошибка при загрузке настроек.")
 
 
+@router.callback_query(F.data == "open_lang")
+async def open_lang(callback: CallbackQuery):
+    try:
+        async with get_atomic_db() as db:
+            user = await UserService(db).get_user_by_filter(telegram_id=callback.from_user.id)
+            if not user:
+                await callback.answer("Не найден", show_alert=False)
+                return
+            st = await db.user.get_or_create_settings(user.id)
+            lang = st.language
+            await callback.message.edit_text(t(lang, 'choose_lang_title'))
+            await callback.message.edit_reply_markup(reply_markup=_lang_keyboard(lang))
+        await callback.answer()
+    except Exception as e:
+        main_logger.error(f"open_lang error: {e}")
+        await callback.answer("Ошибка", show_alert=False)
+
+
+@router.callback_query(F.data == "open_tz")
+async def open_tz(callback: CallbackQuery):
+    try:
+        async with get_atomic_db() as db:
+            user = await UserService(db).get_user_by_filter(telegram_id=callback.from_user.id)
+            if not user:
+                await callback.answer("Не найден", show_alert=False)
+                return
+            st = await db.user.get_or_create_settings(user.id)
+            lang = st.language
+            await callback.message.edit_text(t(lang, 'choose_tz_title'))
+            await callback.message.edit_reply_markup(reply_markup=_tz_keyboard(lang, st.time_zone))
+        await callback.answer()
+    except Exception as e:
+        main_logger.error(f"open_tz error: {e}")
+        await callback.answer("Ошибка", show_alert=False)
+
+
+@router.callback_query(F.data == "settings_back")
+async def settings_back(callback: CallbackQuery):
+    try:
+        async with get_atomic_db() as db:
+            user = await UserService(db).get_user_by_filter(telegram_id=callback.from_user.id)
+            if not user:
+                await callback.answer("Не найден", show_alert=False)
+                return
+            st = await db.user.get_or_create_settings(user.id)
+            lang = st.language
+            tz = st.time_zone
+            await callback.message.edit_text(_settings_main_text(lang, tz))
+            await callback.message.edit_reply_markup(reply_markup=_settings_main_keyboard(lang))
+        await callback.answer()
+    except Exception as e:
+        main_logger.error(f"settings_back error: {e}")
+        await callback.answer("Ошибка", show_alert=False)
+
+
 @router.callback_query(F.data.startswith("set_lang:"))
 async def set_language(callback: CallbackQuery):
-    lang = callback.data.split(":", 1)[1].lower()
-    if lang not in {x.value for x in Language}:
+    lang_value = callback.data.split(":", 1)[1].lower()
+    if lang_value not in {x.value for x in Language}:
         await callback.answer("Недопустимый язык", show_alert=False)
         return
     try:
@@ -82,13 +157,13 @@ async def set_language(callback: CallbackQuery):
             if not user:
                 await callback.answer("Не найден", show_alert=False)
                 return
-            await db.user.update_settings(user.id, {"language": lang})
+            await db.user.update_settings(user.id, {"language": lang_value})
             st = await db.user.get_settings(user.id)
-        try:
-            await callback.message.edit_reply_markup(reply_markup=_settings_keyboard(st.language, st.time_zone))
-        except Exception:
-            pass
-        await callback.answer("Сохранено")
+            cur_lang = st.language
+            # Обновляем заголовок и клавиатуру экрана выбора языка
+            await callback.message.edit_text(t(cur_lang, 'choose_lang_title'))
+            await callback.message.edit_reply_markup(reply_markup=_lang_keyboard(cur_lang))
+        await callback.answer(t(lang_value, 'saved'))
     except Exception as e:
         main_logger.error(f"set_language error: {e}")
         await callback.answer("Ошибка", show_alert=False)
@@ -96,8 +171,8 @@ async def set_language(callback: CallbackQuery):
 
 @router.callback_query(F.data.startswith("set_tz:"))
 async def set_time_zone(callback: CallbackQuery):
-    tz = callback.data.split(":", 1)[1].upper()
-    if tz not in {x.value for x in TimeZone}:
+    tz_value = callback.data.split(":", 1)[1].upper()
+    if tz_value not in {x.value for x in TimeZone}:
         await callback.answer("Недопустимая TZ", show_alert=False)
         return
     try:
@@ -106,13 +181,13 @@ async def set_time_zone(callback: CallbackQuery):
             if not user:
                 await callback.answer("Не найден", show_alert=False)
                 return
-            await db.user.update_settings(user.id, {"time_zone": tz})
+            await db.user.update_settings(user.id, {"time_zone": tz_value})
             st = await db.user.get_settings(user.id)
-        try:
-            await callback.message.edit_reply_markup(reply_markup=_settings_keyboard(st.language, st.time_zone))
-        except Exception:
-            pass
-        await callback.answer("Сохранено")
+            cur_lang = st.language
+            # Обновляем заголовок и клавиатуру экрана выбора TZ
+            await callback.message.edit_text(t(cur_lang, 'choose_tz_title'))
+            await callback.message.edit_reply_markup(reply_markup=_tz_keyboard(cur_lang, st.time_zone))
+        await callback.answer(t(cur_lang, 'saved'))
     except Exception as e:
         main_logger.error(f"set_time_zone error: {e}")
         await callback.answer("Ошибка", show_alert=False)
@@ -122,10 +197,15 @@ async def set_time_zone(callback: CallbackQuery):
     {"📊 Отчет", "📊 Отчёт", "Отчёт", "Отчет"}
 ))
 async def show_report(message: Message):
-    # Параметры окна отчёта (можно вынести в конфиг)
     within_hours = 24
     try:
         async with get_atomic_db() as db:
+            # Получаем язык/часовой пояс вызывающего
+            user = await UserService(db).get_user_by_filter(telegram_id=message.from_user.id)
+            st = await db.user.get_or_create_settings(user.id) if user else None
+            lang = st.language if st else Language.RU.value
+            tz = st.time_zone if st else TimeZone.GMT.value
+
             total_channels = await db.channel.count_channels()
             total_keywords = len(await db.keywords.get_all_keywords())
             total_matched_posts = await db.post.count_distinct_posts_with_matches(within_hours)
@@ -133,65 +213,56 @@ async def show_report(message: Message):
             postponed = await db.post.count_processing_by_status(PostStatus.POSTPONED.value, within_hours)
             pending = await db.post.count_processing_by_status(PostStatus.PENDING.value, within_hours)
 
-            # Статистика по операторам
+            # Статистика по операторам (оставим формат строк как есть)
             op_stats_raw = await db.post.get_operator_stats(within_hours)
             op_lines = []
             for op_id, proc_cnt, postp_cnt in op_stats_raw:
-                user = await db.user.get_user_by_filter(id=op_id)
-                if user and getattr(user, "username", None):
-                    display = f"@{user.username}"
-                elif user:
-                    name_parts = [p for p in [getattr(user, 'first_name', None), getattr(user, 'last_name', None)] if p]
-                    visible = " ".join(name_parts) if name_parts else str(user.telegram_id)
-                    display = f"<a href=\"tg://user?id={user.telegram_id}\">{visible}</a>"
+                u = await db.user.get_user_by_filter(id=op_id)
+                if u and getattr(u, "username", None):
+                    display = f"@{u.username}"
+                elif u:
+                    name_parts = [p for p in [getattr(u, 'first_name', None), getattr(u, 'last_name', None)] if p]
+                    visible = " ".join(name_parts) if name_parts else str(u.telegram_id)
+                    display = f"<a href=\"tg://user?id={u.telegram_id}\">{visible}</a>"
                 else:
-                    display = "неизвестно"
+                    display = "—"
+                # пока без локализации подписи
                 op_lines.append(f"• {display}: <b>{proc_cnt}</b> разобранных, <b>{postp_cnt}</b> отложенных")
 
-        # Красивый текст отчёта в сообщении
         text = (
-            "📊 <b>Отчёт</b> (за последние 24 часа)\n\n"
-            f"1. Всего каналов: <b>{total_channels}</b>\n"
-            f"2. Всего ключевых слов: <b>{total_keywords}</b>\n"
-            f"3. Найдено постов по ключевым словам: <b>{total_matched_posts}</b>\n"
-            f"4. Разобрано: <b>{processed}</b>\n"
-            f"5. Отложенно: <b>{postponed}</b>\n"
-            f"6. Ожидающие разбора: <b>{pending}</b>\n\n"
-            "👤 <b>Операторы, разбиравшие инциденты:</b>\n"
-            + ("\n".join(op_lines) if op_lines else "—")
+            f"{t(lang, 'report_title', hours=within_hours)}\n\n"
+            f"{t(lang, 'total_channels', n=total_channels)}\n"
+            f"{t(lang, 'total_keywords', n=total_keywords)}\n"
+            f"{t(lang, 'found_posts', n=total_matched_posts)}\n"
+            f"{t(lang, 'processed', n=processed)}\n"
+            f"{t(lang, 'postponed', n=postponed)}\n"
+            f"{t(lang, 'pending', n=pending)}"
+            + (t(lang, 'operators_header') + "\n" + ("\n".join(op_lines) if op_lines else t(lang, 'dash')))
         )
         await message.answer(text, disable_web_page_preview=True)
 
-        # Генерация подробного отчёта DOCX (если доступна библиотека)
+        # DOCX отчёт
         if DocxDocument is None:
-            await message.answer("⚠️ Подробный .docx отчёт недоступен (библиотека python-docx не установлена).")
+            await message.answer("⚠️ Подробный .docx отчёт недоступен (python-docx не установлен).")
             return
 
         try:
             async with get_atomic_db() as db:
                 posts = await db.post.get_recent_matched_posts(within_hours)
-                # получаем настройки инициатора отчёта
-                user = await UserService(db).get_user_by_filter(telegram_id=message.from_user.id)
-                user_tz = None
-                if user:
-                    st = await db.user.get_or_create_settings(user.id)
-                    user_tz = st.time_zone
 
             doc = DocxDocument()
-            doc.add_heading("Отчёт по мониторингу Telegram", level=0)
-            doc.add_paragraph(f"Период: последние {within_hours} ч.")
+            doc.add_heading(t(lang, 'report_title', hours=within_hours), level=0)
             doc.add_paragraph("")
-            doc.add_paragraph(f"Всего каналов: {total_channels}")
-            doc.add_paragraph(f"Всего ключевых слов: {total_keywords}")
-            doc.add_paragraph(f"Найдено постов по ключевым словам: {total_matched_posts}")
-            doc.add_paragraph(f"Разобрано: {processed}")
-            doc.add_paragraph(f"Отложенно: {postponed}")
-            doc.add_paragraph(f"Ожидающие разбора: {pending}")
+            doc.add_paragraph(t(lang, 'total_channels', n=total_channels))
+            doc.add_paragraph(t(lang, 'total_keywords', n=total_keywords))
+            doc.add_paragraph(t(lang, 'found_posts', n=total_matched_posts))
+            doc.add_paragraph(t(lang, 'processed', n=processed))
+            doc.add_paragraph(t(lang, 'postponed', n=postponed))
+            doc.add_paragraph(t(lang, 'pending', n=pending))
 
-            doc.add_heading("Операторы", level=1)
+            doc.add_heading("Operators", level=1)
             if op_lines:
                 for line in op_lines:
-                    # Уберём HTML из docx-версии
                     plain = (
                         line.replace("<b>", "").replace("</b>", "")
                             .replace("<a href=\"tg://user?id=", "").replace("\">", " ")
@@ -201,14 +272,13 @@ async def show_report(message: Message):
             else:
                 doc.add_paragraph("—")
 
-            doc.add_heading("Подробные посты", level=1)
+            doc.add_heading("Posts", level=1)
             for p in posts:
-                ch_title = getattr(getattr(p, "channel", None), "title", "Канал") or "Канал"
+                ch_title = getattr(getattr(p, "channel", None), "title", "Channel") or "Channel"
                 doc.add_heading(ch_title, level=2)
-                doc.add_paragraph(f"Дата: {format_dt(getattr(p, 'published_at', None), user_tz)}")
+                doc.add_paragraph(f"{t(lang, 'notify_date', dt=format_dt(getattr(p, 'published_at', None), tz))}")
                 if getattr(p, "url", None):
-                    doc.add_paragraph(f"Ссылка: {p.url}")
-                # Ключевые слова
+                    doc.add_paragraph(f"URL: {p.url}")
                 kw_texts = []
                 try:
                     for mk in getattr(p, "matched_keywords", []) or []:
@@ -218,10 +288,9 @@ async def show_report(message: Message):
                 except Exception:
                     pass
                 if kw_texts:
-                    doc.add_paragraph("Ключевые слова: " + ", ".join(kw_texts))
-                # Текст поста
+                    doc.add_paragraph("Keywords: " + ", ".join(kw_texts))
                 preview = (p.text or "").strip()
-                doc.add_paragraph(preview if preview else "(без текста)")
+                doc.add_paragraph(preview if preview else "(no text)")
                 doc.add_paragraph("")
 
             bio = BytesIO()
@@ -229,7 +298,7 @@ async def show_report(message: Message):
             bio.seek(0)
             fname = f"report_{within_hours}h.docx"
             file = BufferedInputFile(bio.read(), filename=fname)
-            await message.answer_document(file, caption="Подробный отчёт")
+            await message.answer_document(file, caption=t(lang, 'detailed_report_caption'))
         except Exception as e:
             main_logger.error(f"show_report docx error: {e}")
             await message.answer("⚠️ Не удалось сформировать отчёт. Попробуйте позже.")

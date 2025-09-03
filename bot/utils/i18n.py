@@ -15,9 +15,15 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "dash": "—",
         "detailed_report_caption": "Подробный отчёт",
         "settings_title": "⚙️ <b>Настройки</b>",
+        "settings_main": "Выберите раздел настроек ниже.",
         "settings_lang": "Язык интерфейса: <b>{lang}</b>",
         "settings_tz": "Часовой пояс: <b>{tz}</b>",
         "settings_choose": "Выберите новые значения ниже.",
+        "choose_lang_title": "🌐 Выбор языка",
+        "choose_tz_title": "🕒 Выбор часового пояса",
+        "btn_lang": "🌐 Язык",
+        "btn_tz": "🕒 Часовой пояс",
+        "back": "⬅️ Назад",
         "saved": "Сохранено",
         "invalid_language": "Недопустимый язык",
         "invalid_tz": "Недопустимая TZ",
@@ -40,9 +46,15 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "dash": "—",
         "detailed_report_caption": "Detailed report",
         "settings_title": "⚙️ <b>Settings</b>",
+        "settings_main": "Choose a settings section below.",
         "settings_lang": "Interface language: <b>{lang}</b>",
         "settings_tz": "Time zone: <b>{tz}</b>",
         "settings_choose": "Choose new values below.",
+        "choose_lang_title": "🌐 Language selection",
+        "choose_tz_title": "🕒 Time zone selection",
+        "btn_lang": "🌐 Language",
+        "btn_tz": "🕒 Time zone",
+        "back": "⬅️ Back",
         "saved": "Saved",
         "invalid_language": "Invalid language",
         "invalid_tz": "Invalid TZ",
@@ -64,4 +76,3 @@ def t(lang: str | None, key: str, **kwargs) -> str:
         return template.format(**kwargs)
     except Exception:
         return template
-
