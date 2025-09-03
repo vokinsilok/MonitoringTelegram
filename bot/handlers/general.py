@@ -3,7 +3,7 @@ from aiogram.types import Message, CallbackQuery, BufferedInputFile, InlineKeybo
 from io import BytesIO
 from docx import Document as DocxDocument
 from app.core.logging import main_logger
-from bot.keyboards.keyboards import get_operator_access_request_keyboard
+from bot.keyboards.keyboards import get_operator_access_request_keyboard, get_main_keyboard
 from bot.service.user_service import UserService
 from bot.utils.depend import get_atomic_db
 from bot.models.post import PostStatus
@@ -29,7 +29,7 @@ def _format_requester_display(user) -> str:
 def _settings_main_text(lang: str, tz: str) -> str:
     return (
         f"{t(lang, 'settings_title')}\n\n"
-        f"{t(lang, 'settings_lang', lang=lang.upper())}\n"
+        f"{t(lang, 'settings_lang', lang_code=lang.upper())}\n"
         f"{t(lang, 'settings_tz', tz=tz)}\n\n"
         f"{t(lang, 'settings_main')}"
     )
@@ -73,7 +73,7 @@ def _tz_keyboard(cur_lang: str, cur_tz: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[row1, row2, [InlineKeyboardButton(text=t(cur_lang, 'back'), callback_data="settings_back")]])
 
 
-@router.message(F.text.in_({"⚙️ Настройки", "⚙️ Настройки"}))
+@router.message(F.text.in_({"⚙️ Настройки", "⚙️ Settings"}))
 async def show_settings(message: Message):
     try:
         async with get_atomic_db() as db:
@@ -164,6 +164,17 @@ async def set_language(callback: CallbackQuery):
             await callback.message.edit_text(t(cur_lang, 'choose_lang_title'))
             await callback.message.edit_reply_markup(reply_markup=_lang_keyboard(cur_lang))
         await callback.answer(t(lang_value, 'saved'))
+        # Обновляем главное меню (ReplyKeyboard) в соответствии с новым языком
+        # Определяем роль
+        is_admin = getattr(user, 'role', '') == 'admin' or getattr(user, 'is_admin', False)
+        is_operator = getattr(user, 'role', '') == 'operator' or getattr(user, 'is_operator', False)
+        try:
+            await callback.message.answer(
+                t(lang_value, 'saved'),
+                reply_markup=get_main_keyboard(lang_value, is_admin=is_admin, is_operator=is_operator)
+            )
+        except Exception:
+            pass
     except Exception as e:
         main_logger.error(f"set_language error: {e}")
         await callback.answer("Ошибка", show_alert=False)
@@ -194,7 +205,7 @@ async def set_time_zone(callback: CallbackQuery):
 
 
 @router.message(F.text.in_(
-    {"📊 Отчет", "📊 Отчёт", "Отчёт", "Отчет"}
+    {"📊 Отчет", "📊 Отчёт", "Отчёт", "Отчет", "📊 Report"}
 ))
 async def show_report(message: Message):
     within_hours = 24
@@ -456,7 +467,7 @@ async def show_feedback(message: Message):
     await message.answer(text)
 
 
-@router.message(F.text.in_({"❓О системе", "❓ О системе"}))
+@router.message(F.text.in_({"❓О системе", "❓ О системе", "❓About", "❓ About", "❓About", "❓About"}))
 async def about_system(message: Message):
     text = (
         "❓ <b>О системе</b>\n\n"

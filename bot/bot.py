@@ -47,33 +47,42 @@ async def command_start_handler(message: Message) -> None:
             is_admin=False,
             is_operator=False
         ))
+        # получаем язык интерфейса пользователя
+        st = None
+        try:
+            st = await db.user.get_or_create_settings(user.id)
+        except Exception:
+            pass
+        lang = getattr(st, "language", None)
+
+    name = user.first_name or user.username or str(user.telegram_id)
     if user and user.role == "user":
         await message.answer(
             "👋 <b>Здравствуйте, {name}!</b>\n\n"
             "Я ваш помощник по мониторингу Telegram‑каналов.\n"
             "Ваша роль — <b>Пользователь</b>.\n\n"
             "Вы можете запросить доступ оператора с помощью кнопки \"📝 Получить доступ оператора\" ниже.".format(
-                name=user.first_name or user.username or str(user.telegram_id)
+                name=name
             ),
-            reply_markup=get_main_keyboard()
+            reply_markup=get_main_keyboard(lang, is_admin=False, is_operator=False)
         )
     elif user and user.role == "admin":
         await message.answer(
             "👋 <b>Здравствуйте, {name}!</b>\n\n"
             "Ваша роль — <b>Администратор</b>.\n"
             "Используйте меню ниже для управления каналами, ключевыми словами, операторами и Telethon‑аккаунтами.".format(
-                name=user.first_name or user.username or str(user.telegram_id)
+                name=name
             ),
-            reply_markup=get_main_keyboard(is_admin=True)
+            reply_markup=get_main_keyboard(lang, is_admin=True)
         )
     elif user and user.role == "operator":
         await message.answer(
             "👋 <b>Здравствуйте, {name}!</b>\n\n"
             "Ваша роль — <b>Оператор</b>.\n"
             "Используйте кнопки ниже, чтобы предлагать каналы и ключевые слова, а также смотреть отчёты.".format(
-                name=user.first_name or user.username or str(user.telegram_id)
+                name=name
             ),
-            reply_markup=get_main_keyboard(is_operator=True)
+            reply_markup=get_main_keyboard(lang, is_operator=True)
         )
     else:
         await message.answer(

@@ -1,4 +1,6 @@
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton
+from typing import Optional
+from bot.utils.i18n import t
 
 
 def get_post_keyboard(pp_id: int, post_id: int, post_url: str) -> InlineKeyboardMarkup:
@@ -96,33 +98,24 @@ def get_keyword_proposal_keyboard(proposal_id: int) -> InlineKeyboardMarkup:
     return keyboard
 
 
-def get_main_keyboard(is_admin: bool = False, is_operator: bool = False) -> ReplyKeyboardMarkup:
+def get_main_keyboard(lang: Optional[str] = None, *, is_admin: bool = False, is_operator: bool = False) -> ReplyKeyboardMarkup:
     """
-    Создает основную клавиатуру для пользователя.
-    
-    Args:
-        is_admin: Является ли пользователь администратором
-        is_operator: Является ли пользователь оператором
-    
-    Returns:
-        ReplyKeyboardMarkup: Основная клавиатура
+    Создает основную клавиатуру для пользователя с учётом языка.
     """
-    # Создаем кнопки
-    # Общие кнопки для всех пользователей
-    report_button = KeyboardButton(text="📊 Отчет")
-    settings_button = KeyboardButton(text="⚙️ Настройки")
+    # Общие кнопки
+    report_button = KeyboardButton(text=t(lang, "btn_report"))
+    settings_button = KeyboardButton(text=t(lang, "btn_settings"))
 
     if is_admin:
         # Кнопки для администратора
-        add_channel_button = KeyboardButton(text="➕ Добавить канал")
-        add_keyword_button = KeyboardButton(text="🔑 Добавить ключевое слово")
-        manage_operators_button = KeyboardButton(text="👥 Управление операторами")
-        add_telethon_button = KeyboardButton(text="🔐 Добавить Telethon")
-        # Новые кнопки пакетной загрузки
-        bulk_channels_button = KeyboardButton(text="📥 Добавить каналы")
-        bulk_keywords_button = KeyboardButton(text="📥 Добавить ключевые слова")
+        add_channel_button = KeyboardButton(text=t(lang, "btn_add_channel"))
+        add_keyword_button = KeyboardButton(text=t(lang, "btn_add_keyword"))
+        manage_operators_button = KeyboardButton(text=t(lang, "btn_manage_operators"))
+        add_telethon_button = KeyboardButton(text=t(lang, "btn_add_telethon"))
+        # Пакетная загрузка
+        bulk_channels_button = KeyboardButton(text=t(lang, "btn_bulk_channels"))
+        bulk_keywords_button = KeyboardButton(text=t(lang, "btn_bulk_keywords"))
 
-        # Создаем массив кнопок для клавиатуры
         keyboard_buttons = [
             [add_channel_button, add_keyword_button],
             [manage_operators_button, add_telethon_button],
@@ -130,33 +123,24 @@ def get_main_keyboard(is_admin: bool = False, is_operator: bool = False) -> Repl
             [report_button, settings_button],
         ]
     elif is_operator:
-        # Кнопки для оператора
-        propose_channel_button = KeyboardButton(text="📢 Предложить канал")
-        propose_keyword_button = KeyboardButton(text="🔍 Предложить ключевое слово")
-
-        
-        # Создаем массив кнопок для клавиатуры
+        propose_channel_button = KeyboardButton(text=t(lang, "btn_propose_channel"))
+        propose_keyword_button = KeyboardButton(text=t(lang, "btn_propose_keyword"))
         keyboard_buttons = [
             [propose_channel_button, propose_keyword_button],
             [report_button, settings_button],
         ]
     else:
-        # Кнопки для обычного пользователя (клиента)
-        new_request_button = KeyboardButton(text="📝 Получить доступ оператора")
-        feedback_button = KeyboardButton(text="💬 Обратная связь")
-        help_button = KeyboardButton(text="❓О системе")
-        
-        # Создаем массив кнопок для клавиатуры
+        new_request_button = KeyboardButton(text=t(lang, "btn_request_operator"))
+        feedback_button = KeyboardButton(text=t(lang, "btn_feedback"))
+        help_button = KeyboardButton(text=t(lang, "btn_help"))
         keyboard_buttons = [
             [new_request_button],
             [feedback_button, help_button],
             [report_button, settings_button],
         ]
-    
-    # Создаем клавиатуру с обязательным полем keyboard
-    keyboard = ReplyKeyboardMarkup(keyboard=keyboard_buttons, resize_keyboard=True)
-    
-    return keyboard
+
+    return ReplyKeyboardMarkup(keyboard=keyboard_buttons, resize_keyboard=True)
+
 
 def get_operator_access_request_keyboard(user_id: int) -> InlineKeyboardMarkup:
     """
