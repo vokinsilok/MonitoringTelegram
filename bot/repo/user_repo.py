@@ -2,7 +2,7 @@ from pydantic import BaseModel
 from sqlalchemy import select, insert, update
 from typing import List, Optional
 
-from bot.models.user_model import User, UserRole
+from bot.models.user_model import User, UserRole, UserSettings, TimeZone, Language
 from bot.repo.base_repo import BaseRepository
 
 
@@ -20,10 +20,16 @@ class UserRepository(BaseRepository):
         obj = await self.session.execute(stmt)
         user = obj.scalar()
         if user:
+            # гарантируем наличие настроек
+            await self.get_or_create_settings(user.id)
             return user
         else:
             new_user = await self.session.execute(insert(User).values(data.model_dump()).returning(User))
-            return new_user.scalar()
+            user = new_user.scalar()
+            # создаём настройки по умолчанию
+            if user:
+                await self.create_settings(user.id)
+            return user
 
     async def get_admins(self) -> List[User]:
         """Получить список всех администраторов"""
@@ -66,3 +72,46 @@ class UserRepository(BaseRepository):
         if user:
             await self.session.commit()
         return user
+
+    # -------- Работа с настройками пользователя --------
+    async def get_settings(self, user_id: int) -> Optional[UserSettings]:
+        stmt = select(UserSettings).where(UserSettings.user_id == user_id)
+        obj = await self.session.execute(stmt)
+        return obj.scalar_one_or_none()
+
+    async def create_settings(
+        self,
+        user_id: int,
+        *,
+        time_zone: Optional[str] = None,
+        language: Optional[str] = None,
+    ) -> UserSettings:
+        payload = {
+            "user_id": user_id,
+            "time_zone": time_zone or TimeZone.GMT.value,
+            "language": language or Language.RU.value,
+        }
+        res = await self.session.execute(
+            insert(UserSettings).values(**payload).returning(UserSettings)
+        )
+        await self.session.commit()
+        return res.scalar()
+
+    async def get_or_create_settings(self, user_id: int) -> UserSettings:
+        st = await self.get_settings(user_id)
+        if st:
+            return st
+        return await self.create_settings(user_id)
+
+    async def update_settings(self, user_id: int, values: dict) -> Optional[UserSettings]:
+        upd = (
+            update(UserSettings)
+            .where(UserSettings.user_id == user_id)
+            .values(**values)
+            .returning(UserSettings)
+        )
+        obj = await self.session.execute(upd)
+        st = obj.scalar_one_or_none()
+        if st:
+            await self.session.commit()
+        return st

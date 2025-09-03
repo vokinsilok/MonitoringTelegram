@@ -110,7 +110,8 @@ def get_main_keyboard(is_admin: bool = False, is_operator: bool = False) -> Repl
     # Создаем кнопки
     # Общие кнопки для всех пользователей
     report_button = KeyboardButton(text="📊 Отчет")
-    
+    settings_button = KeyboardButton(text="⚙️ Настройки")
+
     if is_admin:
         # Кнопки для администратора
         add_channel_button = KeyboardButton(text="➕ Добавить канал")
@@ -126,7 +127,7 @@ def get_main_keyboard(is_admin: bool = False, is_operator: bool = False) -> Repl
             [add_channel_button, add_keyword_button],
             [manage_operators_button, add_telethon_button],
             [bulk_channels_button, bulk_keywords_button],
-            [report_button]
+            [report_button, settings_button],
         ]
     elif is_operator:
         # Кнопки для оператора
@@ -137,7 +138,7 @@ def get_main_keyboard(is_admin: bool = False, is_operator: bool = False) -> Repl
         # Создаем массив кнопок для клавиатуры
         keyboard_buttons = [
             [propose_channel_button, propose_keyword_button],
-            [report_button]
+            [report_button, settings_button],
         ]
     else:
         # Кнопки для обычного пользователя (клиента)
@@ -148,7 +149,8 @@ def get_main_keyboard(is_admin: bool = False, is_operator: bool = False) -> Repl
         # Создаем массив кнопок для клавиатуры
         keyboard_buttons = [
             [new_request_button],
-            [feedback_button, help_button]
+            [feedback_button, help_button],
+            [report_button, settings_button],
         ]
     
     # Создаем клавиатуру с обязательным полем keyboard

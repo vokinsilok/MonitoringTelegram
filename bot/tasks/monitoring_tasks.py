@@ -14,6 +14,8 @@ from app.core.config import settings
 from app.core.logging import main_logger
 from bot.models.keyword import KeywordType
 from bot.utils.depend import get_atomic_db
+from bot.utils.time_utils import format_dt
+from bot.utils.i18n import t
 
 
 def _compile_keyword_patterns(keywords) -> List[tuple[int, str, re.Pattern]]:
@@ -290,6 +292,11 @@ async def notify_loop(bot):
                     if not operator:
                         notified.add(pp.id)
                         continue
+                    # Получаем настройки пользователя
+                    st = await db.user.get_or_create_settings(operator.id)
+                    lang = st.language
+                    tz = st.time_zone
+
                     post = pp.post
                     ch = post.channel if hasattr(post, "channel") else None
                     title = escape(getattr(ch, "title", "Канал") or "Канал")
@@ -303,20 +310,20 @@ async def notify_loop(bot):
                     try:
                         for mk in getattr(post, "matched_keywords", []) or []:
                             if getattr(mk, "keyword", None) and mk.keyword.text:
-                                t = mk.keyword.text
-                                if t not in kw_texts:
-                                    kw_texts.append(t)
+                                tkw = mk.keyword.text
+                                if tkw not in kw_texts:
+                                    kw_texts.append(tkw)
                     except Exception:
                         pass
-                    kw_line = ("\n<b>Ключевые слова:</b> " + ", ".join(f"<code>{escape(k)}</code>" for k in kw_texts)) if kw_texts else ""
+                    kw_line = ("\n" + t(lang, "notify_keywords", kws=", ".join(f"<code>{escape(k)}</code>" for k in kw_texts))) if kw_texts else ""
 
                     msg_text = (
-                        f"🔍 <b>Найден пост по ключевым словам</b>\n\n"
-                        f"📢 <b>Канал:</b> {title}\n"
-                        f"🕒 <b>Дата:</b> {post.published_at:%Y-%m-%d %H:%M:%S}\n"
-                        f"🔗 <b>Ссылка:</b> {escape(url)}\n"
+                        f"{t(lang, 'notify_found')}\n\n"
+                        f"{t(lang, 'notify_channel', title=title)}\n"
+                        f"{t(lang, 'notify_date', dt=escape(format_dt(post.published_at, tz)))}\n"
+                        f"{t(lang, 'notify_link', url=escape(url))}\n"
                         f"{kw_line}\n\n"
-                        f"<b>Текст:</b>\n{preview}"
+                        f"{t(lang, 'notify_text', preview=preview)}"
                     )
                     kb = get_post_keyboard(pp.id, post.id, url)
                     try:

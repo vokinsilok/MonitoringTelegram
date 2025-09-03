@@ -1,5 +1,5 @@
 from aiogram import Router, F
-from aiogram.types import Message, CallbackQuery, BufferedInputFile
+from aiogram.types import Message, CallbackQuery, BufferedInputFile, InlineKeyboardMarkup, InlineKeyboardButton
 from io import BytesIO
 from docx import Document as DocxDocument
 from app.core.logging import main_logger
@@ -7,6 +7,8 @@ from bot.keyboards.keyboards import get_operator_access_request_keyboard
 from bot.service.user_service import UserService
 from bot.utils.depend import get_atomic_db
 from bot.models.post import PostStatus
+from bot.models.user_model import Language, TimeZone
+from bot.utils.time_utils import format_dt
 
 
 
@@ -21,7 +23,104 @@ def _format_requester_display(user) -> str:
     return f"<a href=\"tg://user?id={user.telegram_id}\">{visible_name}</a>"
 
 
-@router.message(F.text.in_({"📊 Отчет", "📊 Отчёт", "Отчёт", "Отчет"}))
+def _settings_keyboard(cur_lang: str | None, cur_tz: str | None) -> InlineKeyboardMarkup:
+    cur_lang = (cur_lang or Language.RU.value).lower()
+    cur_tz = (cur_tz or TimeZone.GMT.value).upper()
+    def mark(v: str, cur: str) -> str:
+        return ("✓ " + v) if v.lower() == cur.lower() else v
+    langs = [
+        InlineKeyboardButton(text=mark("RU", cur_lang), callback_data="set_lang:ru"),
+        InlineKeyboardButton(text=mark("EN", cur_lang), callback_data="set_lang:en"),
+        InlineKeyboardButton(text=mark("ES", cur_lang), callback_data="set_lang:es"),
+        InlineKeyboardButton(text=mark("FR", cur_lang), callback_data="set_lang:fr"),
+    ]
+    tzs_row1 = [
+        InlineKeyboardButton(text=mark("GMT", cur_tz), callback_data="set_tz:GMT"),
+        InlineKeyboardButton(text=mark("UTC", cur_tz), callback_data="set_tz:UTC"),
+        InlineKeyboardButton(text=mark("MSK", cur_tz), callback_data="set_tz:MSK"),
+    ]
+    tzs_row2 = [
+        InlineKeyboardButton(text=mark("CET", cur_tz), callback_data="set_tz:CET"),
+        InlineKeyboardButton(text=mark("EST", cur_tz), callback_data="set_tz:EST"),
+        InlineKeyboardButton(text=mark("PST", cur_tz), callback_data="set_tz:PST"),
+        InlineKeyboardButton(text=mark("IST", cur_tz), callback_data="set_tz:IST"),
+    ]
+    return InlineKeyboardMarkup(inline_keyboard=[langs, tzs_row1, tzs_row2])
+
+
+@router.message(F.text.in_({"⚙️ Настройки", "⚙️ Настройки"}))
+async def show_settings(message: Message):
+    try:
+        async with get_atomic_db() as db:
+            user = await UserService(db).get_user_by_filter(telegram_id=message.from_user.id)
+            if not user:
+                await message.answer("❌ Пользователь не найден.")
+                return
+            st = await db.user.get_or_create_settings(user.id)
+            text = (
+                "⚙️ <b>Настройки</b>\n\n"
+                f"Язык интерфейса: <b>{st.language.upper()}</b>\n"
+                f"Часовой пояс: <b>{st.time_zone}</b>\n\n"
+                "Выберите новые значения ниже."
+            )
+            kb = _settings_keyboard(st.language, st.time_zone)
+            await message.answer(text, reply_markup=kb)
+    except Exception as e:
+        main_logger.error(f"show_settings error: {e}")
+        await message.answer("⚠️ Ошибка при загрузке настроек.")
+
+
+@router.callback_query(F.data.startswith("set_lang:"))
+async def set_language(callback: CallbackQuery):
+    lang = callback.data.split(":", 1)[1].lower()
+    if lang not in {x.value for x in Language}:
+        await callback.answer("Недопустимый язык", show_alert=False)
+        return
+    try:
+        async with get_atomic_db() as db:
+            user = await UserService(db).get_user_by_filter(telegram_id=callback.from_user.id)
+            if not user:
+                await callback.answer("Не найден", show_alert=False)
+                return
+            await db.user.update_settings(user.id, {"language": lang})
+            st = await db.user.get_settings(user.id)
+        try:
+            await callback.message.edit_reply_markup(reply_markup=_settings_keyboard(st.language, st.time_zone))
+        except Exception:
+            pass
+        await callback.answer("Сохранено")
+    except Exception as e:
+        main_logger.error(f"set_language error: {e}")
+        await callback.answer("Ошибка", show_alert=False)
+
+
+@router.callback_query(F.data.startswith("set_tz:"))
+async def set_time_zone(callback: CallbackQuery):
+    tz = callback.data.split(":", 1)[1].upper()
+    if tz not in {x.value for x in TimeZone}:
+        await callback.answer("Недопустимая TZ", show_alert=False)
+        return
+    try:
+        async with get_atomic_db() as db:
+            user = await UserService(db).get_user_by_filter(telegram_id=callback.from_user.id)
+            if not user:
+                await callback.answer("Не найден", show_alert=False)
+                return
+            await db.user.update_settings(user.id, {"time_zone": tz})
+            st = await db.user.get_settings(user.id)
+        try:
+            await callback.message.edit_reply_markup(reply_markup=_settings_keyboard(st.language, st.time_zone))
+        except Exception:
+            pass
+        await callback.answer("Сохранено")
+    except Exception as e:
+        main_logger.error(f"set_time_zone error: {e}")
+        await callback.answer("Ошибка", show_alert=False)
+
+
+@router.message(F.text.in_(
+    {"📊 Отчет", "📊 Отчёт", "Отчёт", "Отчет"}
+))
 async def show_report(message: Message):
     # Параметры окна отчёта (можно вынести в конфиг)
     within_hours = 24
@@ -68,63 +167,72 @@ async def show_report(message: Message):
             await message.answer("⚠️ Подробный .docx отчёт недоступен (библиотека python-docx не установлена).")
             return
 
-        # Загружаем последние посты с совпадениями
-        async with get_atomic_db() as db:
-            posts = await db.post.get_recent_matched_posts(within_hours)
+        try:
+            async with get_atomic_db() as db:
+                posts = await db.post.get_recent_matched_posts(within_hours)
+                # получаем настройки инициатора отчёта
+                user = await UserService(db).get_user_by_filter(telegram_id=message.from_user.id)
+                user_tz = None
+                if user:
+                    st = await db.user.get_or_create_settings(user.id)
+                    user_tz = st.time_zone
 
-        doc = DocxDocument()
-        doc.add_heading("Отчёт по мониторингу Telegram", level=0)
-        doc.add_paragraph(f"Период: последние {within_hours} ч.")
-        doc.add_paragraph("")
-        doc.add_paragraph(f"Всего каналов: {total_channels}")
-        doc.add_paragraph(f"Всего ключевых слов: {total_keywords}")
-        doc.add_paragraph(f"Найдено постов по ключевым словам: {total_matched_posts}")
-        doc.add_paragraph(f"Разобрано: {processed}")
-        doc.add_paragraph(f"Отложенно: {postponed}")
-        doc.add_paragraph(f"Ожидающие разбора: {pending}")
-
-        doc.add_heading("Операторы", level=1)
-        if op_lines:
-            for line in op_lines:
-                # Уберём HTML из docx-версии
-                plain = (
-                    line.replace("<b>", "").replace("</b>", "")
-                        .replace("<a href=\"tg://user?id=", "").replace("\">", " ")
-                        .replace("</a>", "")
-                )
-                doc.add_paragraph(plain, style="List Bullet")
-        else:
-            doc.add_paragraph("—")
-
-        doc.add_heading("Подробные посты", level=1)
-        for p in posts:
-            ch_title = getattr(getattr(p, "channel", None), "title", "Канал") or "Канал"
-            doc.add_heading(ch_title, level=2)
-            doc.add_paragraph(f"Дата: {getattr(p, 'published_at', '')}")
-            if getattr(p, "url", None):
-                doc.add_paragraph(f"Ссылка: {p.url}")
-            # Ключевые слова
-            kw_texts = []
-            try:
-                for mk in getattr(p, "matched_keywords", []) or []:
-                    if getattr(mk, "keyword", None) and mk.keyword.text:
-                        if mk.keyword.text not in kw_texts:
-                            kw_texts.append(mk.keyword.text)
-            except Exception:
-                pass
-            if kw_texts:
-                doc.add_paragraph("Ключевые слова: " + ", ".join(kw_texts))
-            # Текст поста
-            preview = (p.text or "").strip()
-            doc.add_paragraph(preview if preview else "(без текста)")
+            doc = DocxDocument()
+            doc.add_heading("Отчёт по мониторингу Telegram", level=0)
+            doc.add_paragraph(f"Период: последние {within_hours} ч.")
             doc.add_paragraph("")
+            doc.add_paragraph(f"Всего каналов: {total_channels}")
+            doc.add_paragraph(f"Всего ключевых слов: {total_keywords}")
+            doc.add_paragraph(f"Найдено постов по ключевым словам: {total_matched_posts}")
+            doc.add_paragraph(f"Разобрано: {processed}")
+            doc.add_paragraph(f"Отложенно: {postponed}")
+            doc.add_paragraph(f"Ожидающие разбора: {pending}")
 
-        bio = BytesIO()
-        doc.save(bio)
-        bio.seek(0)
-        fname = f"report_{within_hours}h.docx"
-        file = BufferedInputFile(bio.read(), filename=fname)
-        await message.answer_document(file, caption="Подробный отчёт")
+            doc.add_heading("Операторы", level=1)
+            if op_lines:
+                for line in op_lines:
+                    # Уберём HTML из docx-версии
+                    plain = (
+                        line.replace("<b>", "").replace("</b>", "")
+                            .replace("<a href=\"tg://user?id=", "").replace("\">", " ")
+                            .replace("</a>", "")
+                    )
+                    doc.add_paragraph(plain, style="List Bullet")
+            else:
+                doc.add_paragraph("—")
+
+            doc.add_heading("Подробные посты", level=1)
+            for p in posts:
+                ch_title = getattr(getattr(p, "channel", None), "title", "Канал") or "Канал"
+                doc.add_heading(ch_title, level=2)
+                doc.add_paragraph(f"Дата: {format_dt(getattr(p, 'published_at', None), user_tz)}")
+                if getattr(p, "url", None):
+                    doc.add_paragraph(f"Ссылка: {p.url}")
+                # Ключевые слова
+                kw_texts = []
+                try:
+                    for mk in getattr(p, "matched_keywords", []) or []:
+                        if getattr(mk, "keyword", None) and mk.keyword.text:
+                            if mk.keyword.text not in kw_texts:
+                                kw_texts.append(mk.keyword.text)
+                except Exception:
+                    pass
+                if kw_texts:
+                    doc.add_paragraph("Ключевые слова: " + ", ".join(kw_texts))
+                # Текст поста
+                preview = (p.text or "").strip()
+                doc.add_paragraph(preview if preview else "(без текста)")
+                doc.add_paragraph("")
+
+            bio = BytesIO()
+            doc.save(bio)
+            bio.seek(0)
+            fname = f"report_{within_hours}h.docx"
+            file = BufferedInputFile(bio.read(), filename=fname)
+            await message.answer_document(file, caption="Подробный отчёт")
+        except Exception as e:
+            main_logger.error(f"show_report docx error: {e}")
+            await message.answer("⚠️ Не удалось сформировать отчёт. Попробуйте позже.")
 
     except Exception as e:
         main_logger.error(f"show_report error: {e}")
