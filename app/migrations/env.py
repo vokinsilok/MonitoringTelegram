@@ -7,10 +7,10 @@ from alembic import context
 
 from app.db.database import Base
 from app.core.config import settings
-from bot.models.user_model import User  # noqa: F401
+from bot.models.user_model import User, UserSettings  # noqa: F401
 from bot.models.channel import Channel, ChannelProposal  # noqa: F401
 from bot.models.keyword import Keyword, KeywordProposal  # noqa: F401
-from bot.models.post import Post, PostKeywordMatch, PostProcessing  # noqa: F401
+from bot.models.post import Post, PostKeywordMatch, PostProcessing, Postponed  # noqa: F401
 from bot.models.telethon_account import TelethonAccount  # noqa: F401
 
 # this is the Alembic Config object, which provides
