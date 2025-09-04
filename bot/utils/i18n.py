@@ -1,5 +1,7 @@
 from __future__ import annotations
 from typing import Dict
+import re
+import html
 
 # Очень простой словарь переводов. Можно расширять.
 TRANSLATIONS: Dict[str, Dict[str, str]] = {
@@ -102,3 +104,26 @@ def t(lang: str | None, key: str, **kwargs) -> str:
         return template.format(**kwargs)
     except Exception:
         return template
+
+
+# Утилиты для преобразования HTML-текста (телеграм) в простой текст для DOCX
+_def_tag_block = re.compile(r"<[^>]+>")
+
+def strip_html(text: str) -> str:
+    if not text:
+        return ""
+    # Переводы строк
+    text = text.replace("<br>", "\n").replace("<br/>", "\n").replace("<br />", "\n")
+    # Ссылки: сохраняем внутренний текст
+    text = re.sub(r"<a\b[^>]*>(.*?)</a>", r"\1", text, flags=re.IGNORECASE | re.DOTALL)
+    # Простые теги форматирования удаляем, оставляя содержимое
+    text = re.sub(r"</?(b|strong|i|em|u|s|code|pre|blockquote)>", "", text, flags=re.IGNORECASE)
+    # Удаляем остальные теги, если остались
+    text = re.sub(r"<[^>]+>", "", text)
+    # Декодируем HTML-сущности
+    return html.unescape(text)
+
+
+def t_plain(lang: str | None, key: str, **kwargs) -> str:
+    """Возвращает локализованную строку без HTML-тегов (для DOCX)."""
+    return strip_html(t(lang, key, **kwargs))

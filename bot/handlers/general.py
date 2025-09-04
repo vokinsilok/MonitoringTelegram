@@ -9,7 +9,7 @@ from bot.utils.depend import get_atomic_db
 from bot.models.post import PostStatus
 from bot.models.user_model import Language, TimeZone
 from bot.utils.time_utils import format_dt
-from bot.utils.i18n import t
+from bot.utils.i18n import t, t_plain, strip_html
 
 
 
@@ -262,24 +262,19 @@ async def show_report(message: Message):
                 posts = await db.post.get_recent_matched_posts(within_hours)
 
             doc = DocxDocument()
-            doc.add_heading(t(lang, 'report_title', hours=within_hours), level=0)
+            doc.add_heading(t_plain(lang, 'report_title', hours=within_hours), level=0)
             doc.add_paragraph("")
-            doc.add_paragraph(t(lang, 'total_channels', n=total_channels))
-            doc.add_paragraph(t(lang, 'total_keywords', n=total_keywords))
-            doc.add_paragraph(t(lang, 'found_posts', n=total_matched_posts))
-            doc.add_paragraph(t(lang, 'processed', n=processed))
-            doc.add_paragraph(t(lang, 'postponed', n=postponed))
-            doc.add_paragraph(t(lang, 'pending', n=pending))
+            doc.add_paragraph(t_plain(lang, 'total_channels', n=total_channels))
+            doc.add_paragraph(t_plain(lang, 'total_keywords', n=total_keywords))
+            doc.add_paragraph(t_plain(lang, 'found_posts', n=total_matched_posts))
+            doc.add_paragraph(t_plain(lang, 'processed', n=processed))
+            doc.add_paragraph(t_plain(lang, 'postponed', n=postponed))
+            doc.add_paragraph(t_plain(lang, 'pending', n=pending))
 
             doc.add_heading("Operators", level=1)
             if op_lines:
                 for line in op_lines:
-                    plain = (
-                        line.replace("<b>", "").replace("</b>", "")
-                            .replace("<a href=\"tg://user?id=", "").replace("\">", " ")
-                            .replace("</a>", "")
-                    )
-                    doc.add_paragraph(plain, style="List Bullet")
+                    doc.add_paragraph(strip_html(line), style="List Bullet")
             else:
                 doc.add_paragraph("—")
 
@@ -287,7 +282,7 @@ async def show_report(message: Message):
             for p in posts:
                 ch_title = getattr(getattr(p, "channel", None), "title", "Channel") or "Channel"
                 doc.add_heading(ch_title, level=2)
-                doc.add_paragraph(f"{t(lang, 'notify_date', dt=format_dt(getattr(p, 'published_at', None), tz))}")
+                doc.add_paragraph(t_plain(lang, 'notify_date', dt=format_dt(getattr(p, 'published_at', None), tz)))
                 if getattr(p, "url", None):
                     doc.add_paragraph(f"URL: {p.url}")
                 kw_texts = []
@@ -301,7 +296,7 @@ async def show_report(message: Message):
                 if kw_texts:
                     doc.add_paragraph("Keywords: " + ", ".join(kw_texts))
                 preview = (p.text or "").strip()
-                doc.add_paragraph(preview if preview else "(no text)")
+                doc.add_paragraph(strip_html(preview) if preview else "(no text)")
                 doc.add_paragraph("")
 
             bio = BytesIO()
