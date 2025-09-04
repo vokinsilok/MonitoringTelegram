@@ -40,7 +40,8 @@ async def command_start_handler(message: Message) -> None:
 
     async with get_atomic_db() as db:
         user_service = UserService(db)
-        if not user_service.user_in_white_list(user_id):
+        if not await user_service.user_in_white_list(user_id):
+            main_logger.info(await user_service.user_in_white_list(user_id))
             await message.answer(
                 "❌ <b>Доступ запрещён.</b>\n\n"
                 "Ваш Telegram ID не находится в белом списке. Пожалуйста, свяжитесь с администратором для получения доступа."
