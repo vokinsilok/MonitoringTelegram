@@ -2,13 +2,24 @@ from pydantic import BaseModel
 from sqlalchemy import select, insert, update
 from typing import List, Optional
 
-from bot.models.user_model import User, UserRole, UserSettings, TimeZone, Language
+from bot.models.user_model import User, UserRole, UserSettings, TimeZone, Language, UserWhiteList
 from bot.repo.base_repo import BaseRepository
 
 
 class UserRepository(BaseRepository):
     model = User
     schema = None
+
+    async def create_user_white_list(self, telegram_id: int, username: str) -> User:
+        obj = insert(UserWhiteList).values(telegram_id=telegram_id, username=username).returning(UserWhiteList)
+        new_white = await self.session.execute(obj)
+        await self.session.commit()
+        return new_white.scalar()
+
+    async def get_user_white_list(self, telegram_id: int) -> UserWhiteList:
+        stmt = select(UserWhiteList).where(UserWhiteList.telegram_id == telegram_id)
+        obj = await self.session.execute(stmt)
+        return obj.scalar_one_or_none()
 
     async def get_user_by_filter(self, **filters):
         stmt = select(User).filter_by(**filters)

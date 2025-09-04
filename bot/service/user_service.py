@@ -8,6 +8,11 @@ from bot.utils.depend import get_atomic_db
 
 class UserService(BaseService):
 
+
+    async def user_in_white_list(self, telegram_id: int) -> bool:
+        white = await self.db.user.get_user_white_list(telegram_id)
+        return True if white else False
+
     async def cheek_user_permissions(self, telegram_id: int) -> dict:
         return_dict = {
             "is_admin": False,

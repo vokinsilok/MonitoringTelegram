@@ -36,7 +36,17 @@ async def command_start_handler(message: Message) -> None:
     Обработчик команды /start.
     Приветствует пользователя и проверяет его роль.
     """
+    user_id = message.from_user.id
+
     async with get_atomic_db() as db:
+        user_service = UserService(db)
+        if not user_service.user_in_white_list(user_id):
+            await message.answer(
+                "❌ <b>Доступ запрещён.</b>\n\n"
+                "Ваш Telegram ID не находится в белом списке. Пожалуйста, свяжитесь с администратором для получения доступа."
+            )
+            return
+
         user = await UserService(db).get_or_create_user(message.from_user.id, CreateUserSchema(
             telegram_id=message.from_user.id,
             username=message.from_user.username if message.from_user.username else "",

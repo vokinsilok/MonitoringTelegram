@@ -97,3 +97,15 @@ class UserSettings(Base):
 
     # Отношение к пользователю
     user = relationship("User", back_populates="settings", uselist=False)
+
+
+class UserWhiteList(Base):
+    """
+    Модель белого списка пользователей.
+    Хранит Telegram ID пользователей, которым разрешен доступ к системе.
+    """
+    __tablename__ = "user_whitelist"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    telegram_id: Mapped[int] = mapped_column(BigInteger, unique=True, index=True, nullable=False)
+    username: Mapped[str] = mapped_column(String, index=True, nullable=True)
