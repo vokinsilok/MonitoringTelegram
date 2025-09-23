@@ -70,7 +70,10 @@ def _tz_keyboard(cur_lang: str, cur_tz: str) -> InlineKeyboardMarkup:
         InlineKeyboardButton(text=mark("PST"), callback_data="set_tz:PST"),
         InlineKeyboardButton(text=mark("IST"), callback_data="set_tz:IST"),
     ]
-    return InlineKeyboardMarkup(inline_keyboard=[row1, row2, [InlineKeyboardButton(text=t(cur_lang, 'back'), callback_data="settings_back")]])
+    row3 = [
+        InlineKeyboardButton(text=mark("AEST"), callback_data="set_tz:AEST"),
+    ]
+    return InlineKeyboardMarkup(inline_keyboard=[row1, row2, row3, [InlineKeyboardButton(text=t(cur_lang, 'back'), callback_data="settings_back")]])
 
 
 @router.message(F.text.in_({"⚙️ Настройки", "⚙️ Settings"}))

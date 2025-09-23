@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import Optional
 
 import pytz
+import re
 
 # Соответствие коротких кодов таймзон внутренним идентификаторам pytz
 TIMEZONE_MAP = {
@@ -36,7 +37,36 @@ def get_dt_format(lang: Optional[str]) -> str:
 
 
 def get_tz(code: Optional[str]) -> pytz.BaseTzInfo:
-    tz_name = TIMEZONE_MAP.get((code or "GMT").upper(), "GMT")
+    """Возвращает pytz таймзону по пользовательскому коду.
+
+    Приоритеты:
+    1) Если в настройках указан полный идентификатор таймзоны (например, "Europe/Berlin", "Australia/Sydney"), используем его напрямую.
+    2) Иначе пытаемся сопоставить короткий код из TIMEZONE_MAP (UTC, GMT, MSK, AEST, ...).
+    3) По умолчанию — GMT.
+    """
+    raw = (code or "GMT")
+    try:
+        # Прямое использование полного имени TZ, если оно валидное
+        if raw in pytz.all_timezones:
+            return pytz.timezone(raw)
+        # Иногда передают в разном регистре
+        if raw.title() in pytz.all_timezones:
+            return pytz.timezone(raw.title())
+    except Exception:
+        pass
+
+    # Поддержка смещений вида: UTC+10, GMT-03:30, +5, -8, +0530, +05:30
+    m = re.fullmatch(r"(?:(?:UTC|GMT)\s*)?([+-])\s*(\d{1,2})(?::?(\d{2}))?", str(raw).strip(), flags=re.IGNORECASE)
+    if m:
+        sign, hh, mm = m.group(1), m.group(2), m.group(3)
+        hours = int(hh)
+        minutes = int(mm) if mm else 0
+        total_min = hours * 60 + minutes
+        if sign == '-':
+            total_min = -total_min
+        return pytz.FixedOffset(total_min)
+
+    tz_name = TIMEZONE_MAP.get(raw.upper(), "GMT")
     return pytz.timezone(tz_name)
 
 
