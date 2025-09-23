@@ -15,6 +15,25 @@ TIMEZONE_MAP = {
     "IST": "Asia/Kolkata",
 }
 
+# Рекомендуемые форматы даты/времени по языку интерфейса пользователя
+# Можно расширять при необходимости.
+LANG_DT_FORMATS = {
+    "ru": "%d.%m.%Y %H:%M:%S",
+    "en": "%Y-%m-%d %H:%M:%S",
+    "es": "%d/%m/%Y %H:%M:%S",
+    "fr": "%d/%m/%Y %H:%M:%S",
+    "de": "%d.%m.%Y %H:%M:%S",
+}
+
+def get_dt_format(lang: Optional[str]) -> str:
+    """Возвращает строку формата datetime, соответствующую языку пользователя.
+
+    Если язык не распознан, используется дефолтный ISO-подобный формат.
+    """
+    if not lang:
+        return "%Y-%m-%d %H:%M:%S"
+    return LANG_DT_FORMATS.get(lang.lower(), "%Y-%m-%d %H:%M:%S")
+
 
 def get_tz(code: Optional[str]) -> pytz.BaseTzInfo:
     tz_name = TIMEZONE_MAP.get((code or "GMT").upper(), "GMT")

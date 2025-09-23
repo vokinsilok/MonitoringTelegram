@@ -8,7 +8,7 @@ from bot.service.user_service import UserService
 from bot.utils.depend import get_atomic_db
 from bot.models.post import PostStatus
 from bot.models.user_model import Language, TimeZone
-from bot.utils.time_utils import format_dt
+from bot.utils.time_utils import format_dt, get_dt_format
 from bot.utils.i18n import t, t_plain, strip_html
 
 
@@ -216,6 +216,7 @@ async def show_report(message: Message):
             st = await db.user.get_or_create_settings(user.id) if user else None
             lang = st.language if st else Language.RU.value
             tz = st.time_zone if st else TimeZone.GMT.value
+            fmt = get_dt_format(lang)
 
             total_channels = await db.channel.count_channels()
             total_keywords = len(await db.keywords.get_all_keywords())
@@ -282,7 +283,7 @@ async def show_report(message: Message):
             for p in posts:
                 ch_title = getattr(getattr(p, "channel", None), "title", "Channel") or "Channel"
                 doc.add_heading(ch_title, level=2)
-                doc.add_paragraph(t_plain(lang, 'notify_date', dt=format_dt(getattr(p, 'published_at', None), tz)))
+                doc.add_paragraph(t_plain(lang, 'notify_date', dt=format_dt(getattr(p, 'published_at', None), tz, fmt)))
                 if getattr(p, "url", None):
                     doc.add_paragraph(f"URL: {p.url}")
                 kw_texts = []

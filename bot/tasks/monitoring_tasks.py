@@ -14,7 +14,7 @@ from app.core.config import settings
 from app.core.logging import main_logger
 from bot.models.keyword import KeywordType
 from bot.utils.depend import get_atomic_db
-from bot.utils.time_utils import format_dt
+from bot.utils.time_utils import format_dt, get_dt_format
 from bot.utils.i18n import t
 
 
@@ -296,6 +296,7 @@ async def notify_loop(bot):
                     st = await db.user.get_or_create_settings(operator.id)
                     lang = st.language
                     tz = st.time_zone
+                    fmt = get_dt_format(lang)
 
                     post = pp.post
                     ch = post.channel if hasattr(post, "channel") else None
@@ -320,7 +321,7 @@ async def notify_loop(bot):
                     msg_text = (
                         f"{t(lang, 'notify_found')}\n\n"
                         f"{t(lang, 'notify_channel', title=title)}\n"
-                        f"{t(lang, 'notify_date', dt=escape(format_dt(post.published_at, tz)))}\n"
+                        f"{t(lang, 'notify_date', dt=escape(format_dt(post.published_at, tz, fmt)))}\n"
                         f"{t(lang, 'notify_link', url=escape(url))}\n"
                         f"{kw_line}\n\n"
                         f"{t(lang, 'notify_text', preview=preview)}"
