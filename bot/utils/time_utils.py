@@ -14,6 +14,7 @@ TIMEZONE_MAP = {
     "PST": "US/Pacific",
     "CET": "CET",
     "IST": "Asia/Kolkata",
+    "AEST": "Australia/Sydney",
 }
 
 # Рекомендуемые форматы даты/времени по языку интерфейса пользователя

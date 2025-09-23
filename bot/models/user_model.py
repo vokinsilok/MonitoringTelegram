@@ -69,6 +69,7 @@ class TimeZone(str, Enum):
     CET = "CET"
     IST = "IST"
     GMT = "GMT"
+    AEST = "AEST"
 
 
 class Language(str, Enum):
