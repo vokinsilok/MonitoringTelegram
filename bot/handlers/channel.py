@@ -40,7 +40,8 @@ async def _resolve_real_title(bot: Bot, link_or_username: str) -> str | None:
         username = await _extract_username(link_or_username)
         if not username:
             return None
-        chat = await bot.get_chat(username)
+        chat_id = username if username.startswith("@") else f"@{username}"
+        chat = await bot.get_chat(chat_id)
         # Для каналов/супергрупп у Chat есть поле title
         title = getattr(chat, "title", None)
         if title:
