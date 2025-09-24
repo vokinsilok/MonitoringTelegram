@@ -20,6 +20,37 @@ class ChannelProposalForm(StatesGroup):
     waiting_for_confirmation = State()
 
 
+async def _extract_username(link_or_username: str) -> str | None:
+    """Приводит вход к чистому username без @ и ссылок t.me.
+    Возвращает None, если пусто."""
+    if not link_or_username:
+        return None
+    s = link_or_username.strip()
+    if s.startswith("http://") or s.startswith("https://"):
+        s = s.replace("https://t.me/", "").replace("http://t.me/", "")
+    if s.startswith("@"):
+        s = s[1:]
+    return s or None
+
+
+async def _resolve_real_title(bot: Bot, link_or_username: str) -> str | None:
+    """Пытается получить реальный title канала через Bot API.
+    Возвращает title или None при неудаче."""
+    try:
+        username = await _extract_username(link_or_username)
+        if not username:
+            return None
+        chat = await bot.get_chat(username)
+        # Для каналов/супергрупп у Chat есть поле title
+        title = getattr(chat, "title", None)
+        if title:
+            return title
+        # На всякий случай вернём юзернейм, если title отсутствует
+        return username
+    except Exception:
+        return None
+
+
 @router.message(F.text.startswith("📢 Предложить канал"))
 async def cmd_propose_channel(message: Message, state: FSMContext):
     """Начать процесс предложения канала"""
@@ -120,7 +151,9 @@ async def process_confirmation(message: Message, state: FSMContext):
                         await message.answer(f"ℹ️ Канал <code>{channel_link}</code> уже добавлен для мониторинга.")
                     else:
                         channel_username = channel_link.lstrip("@").replace("https://t.me/", "").replace("http://t.me/", "")
-                        title = channel_username if channel_username else "Unnamed Channel"
+                        # Получаем реальный title канала через Bot API
+                        real_title = await _resolve_real_title(message.bot, channel_username or channel_link)
+                        title = real_title or (channel_username if channel_username else "Unnamed Channel")
                         invite_link = channel_link if channel_link.startswith("http") else None
                         description = comment
                         new_channel = await channel_service.create_channel(AddChannel(
@@ -159,7 +192,9 @@ async def process_confirmation(message: Message, state: FSMContext):
                         await message.answer(f"ℹ️ Канал <code>{channel_link}</code> уже добавлен для мониторинга.")
                     else:
                         channel_username = channel_link.lstrip("@").replace("https://t.me/", "").replace("http://t.me/", "")
-                        title = channel_username if channel_username else "Unnamed Channel"
+                        # Получаем реальный title канала через Bot API
+                        real_title = await _resolve_real_title(message.bot, channel_username or channel_link)
+                        title = real_title or (channel_username if channel_username else "Unnamed Channel")
                         invite_link = channel_link if channel_link.startswith("http") else None
                         description = comment
                         new_channel = await channel_service.create_channel(AddChannel(
