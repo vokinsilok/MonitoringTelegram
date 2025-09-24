@@ -3,8 +3,9 @@ import asyncio
 from telethon import TelegramClient
 from telethon.sessions import StringSession
 
-API_ID = 2040            # ваш api_id
-API_HASH = "b18441a1ff607e10a989891a5462e627" # ваш api_hash
+phone = "+79098447970"
+API_ID = 27389530            # ваш api_id
+API_HASH = "aa23880185a29ab93c832e1641f5335f" # ваш api_hash
 SESSION_FILE = "+2349073156748.session" # путь к вашему .session файлу
 
 async def main():
