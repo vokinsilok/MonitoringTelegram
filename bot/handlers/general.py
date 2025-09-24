@@ -242,7 +242,7 @@ async def show_report(message: Message):
                 else:
                     display = "—"
                 # пока без локализации подписи
-                op_lines.append(f"• {display}: <b>{proc_cnt}</b> разобранных, <b>{postp_cnt}</b> отложенных")
+                op_lines.append(f"• {display}: обработано - <b>{proc_cnt}</b>, отложено - <b>{postp_cnt}</b>")
 
         text = (
             f"{t(lang, 'report_title', hours=within_hours)}\n\n"
