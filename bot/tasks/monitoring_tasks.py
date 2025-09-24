@@ -6,6 +6,7 @@ from html import escape
 from telethon import TelegramClient
 from telethon.sessions import StringSession
 from telethon.errors import RPCError
+from telethon.tl.functions.messages import ImportChatInviteRequest, CheckChatInviteRequest
 
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from bot.keyboards.keyboards import get_post_keyboard
@@ -122,6 +123,84 @@ async def _notify_admins_account_problem(account, bot, error_text: str, notified
         main_logger.error(f"_notify_admins_account_problem error: {e}")
 
 
+def _clean_username(u: str | None) -> str | None:
+    """Normalize a username or t.me URL to a bare username.
+    Examples:
+      '@channel' -> 'channel'
+      'https://t.me/channel' -> 'channel'
+      't.me/channel' -> 'channel'
+    Returns lowercased username without '@'.
+    """
+    if not u:
+        return None
+    s = u.strip()
+    # Strip message URL like https://t.me/username/123 -> username
+    m = re.search(r"(?:https?://)?t\.me/([A-Za-z0-9_]+)/?", s)
+    if m:
+        s = m.group(1)
+    if s.startswith('@'):
+        s = s[1:]
+    return s.lower()
+
+
+def _extract_invite_hash(link: str | None) -> str | None:
+    """Extract invite hash from t.me/+HASH or t.me/joinchat/HASH links."""
+    if not link:
+        return None
+    s = link.strip()
+    # Examples: https://t.me/+AbCdEfGhIj, t.me/+AbCdEf, https://t.me/joinchat/AbCd
+    m = re.search(r"(?:https?://)?t\.me/(?:\+|joinchat/)([A-Za-z0-9_-]+)", s)
+    if m:
+        return m.group(1)
+    return None
+
+
+async def _resolve_channel_entity(client: TelegramClient, ch) -> object | None:
+    """Resolve channel entity by username or invite link with fallbacks.
+    Returns entity or None.
+    """
+    username = _clean_username(getattr(ch, 'channel_username', None))
+    invite_link = getattr(ch, 'invite_link', None)
+
+    # 1) Try by username first, if present
+    if username:
+        try:
+            return await client.get_entity(username)
+        except Exception as e:
+            main_logger.error(f"get_entity error by username '{username}': {e}")
+
+    # 2) Try invite link if provided
+    if invite_link:
+        # 2a) If it's a public t.me/username link, resolve as username
+        pub_username = _clean_username(invite_link)
+        if pub_username and not _extract_invite_hash(invite_link):
+            try:
+                return await client.get_entity(pub_username)
+            except Exception as e:
+                main_logger.error(f"get_entity error by public link '{invite_link}': {e}")
+
+        # 2b) If it's a private invite link, try to check and import invite
+        invite_hash = _extract_invite_hash(invite_link)
+        if invite_hash:
+            try:
+                await client(CheckChatInviteRequest(invite_hash))
+                res = await client(ImportChatInviteRequest(invite_hash))
+                # res.chats typically contains the joined Chat/Channel
+                if getattr(res, 'chats', None):
+                    return res.chats[0]
+                # fallback: try resolving again by link (now that we're a member)
+                try:
+                    return await client.get_entity(invite_link)
+                except Exception:
+                    pass
+            except RPCError as e:
+                main_logger.error(f"invite import failed for '{invite_link}': {e}")
+            except Exception as e:
+                main_logger.error(f"invite handling error for '{invite_link}': {e}")
+
+    return None
+
+
 async def parse_posts_loop(bot):
     """Фоновая задача: парсит посты по активным каналам и создаёт Post/Matches/PostProcessing.
     При проблемах с аккаунтом помечает его как неавторизованный, уведомляет админов и пытается следующий аккаунт."""
@@ -190,16 +269,10 @@ async def parse_posts_loop(bot):
 
             try:
                 for ch in channels:
-                    entity_ref = ch.channel_username or ch.invite_link
-                    if not entity_ref:
-                        continue
-                    try:
-                        entity = await working_client.get_entity(entity_ref)
-                    except RPCError as e:
-                        main_logger.error(f"get_entity failed for channel {entity_ref}: {e}")
-                        continue
-                    except Exception as e:
-                        main_logger.error(f"get_entity error for channel {entity_ref}: {e}")
+                    entity = await _resolve_channel_entity(working_client, ch)
+                    if not entity:
+                        ref = ch.channel_username or ch.invite_link or 'unknown'
+                        main_logger.error(f"resolve channel failed for '{ref}': not found or no access")
                         continue
 
                     min_id = ch.last_parsed_message_id or 0
