@@ -275,16 +275,16 @@ async def show_report(message: Message):
             doc.add_paragraph(t_plain(lang, 'postponed', n=postponed))
             doc.add_paragraph(t_plain(lang, 'pending', n=pending))
 
-            doc.add_heading("Operators", level=1)
+            doc.add_heading("Операторы", level=1)
             if op_lines:
                 for line in op_lines:
                     doc.add_paragraph(strip_html(line), style="List Bullet")
             else:
                 doc.add_paragraph("—")
 
-            doc.add_heading("Posts", level=1)
+            doc.add_heading("Посты", level=1)
             for p in posts:
-                ch_title = getattr(getattr(p, "channel", None), "title", "Channel") or "Channel"
+                ch_title = p.channel.title if p.channel.title else p.channel.channel_username
                 doc.add_heading(ch_title, level=2)
                 doc.add_paragraph(t_plain(lang, 'notify_date', dt=format_dt(getattr(p, 'published_at', None), tz, fmt)))
                 if getattr(p, "url", None):
