@@ -7,11 +7,11 @@ from telethon.sessions import StringSession
 
 # ДАННЫЕ АККАУНТА (из предоставленной строки)
 ACCOUNT_NAME = "Основной"
-API_ID = 29910991
-API_HASH = "e0aad567cd3e51c4fc6f63ad28499cdb"
-PHONE = "+15596163136"
+API_ID = 27389530
+API_HASH = "aa23880185a29ab93c832e1641f5335f"
+PHONE = "+79098447970"
 SESSION_STRING = (
-    "1AZWarzsBuyFyRQVGl93r5FZZHHeDE6waUk4s2fzi5xyem1YP-q1_cMmphIwUI4kMZC8nRIeyddxMXh2yEppImjocuI_K5XDdcBqJHyjrKCujSbkgJSXFzEMEZFKewwvN5IJ3X9s8DSPLGHFqPWjoXCU8BKho5swSc18VyZ3y5q6LpeQKaPHYs7t06fDBfWCYUktBYtsglXLk-ebPq8Zz6tfygVrxQ0eA1NIUoA48jFd9jOFskN9PbZmlvJbzM5jyguf6bG8aYjDZwYAvP3vCISEVRCJbiO9fcn1wIULAjVGu6c_9GdEGrlLKtUQ1rrNZnIsvKiKH-El49UnzYyfUaEoYW_ll_7Q="
+    "1ApWapzMBu8F_NO25WeY86B4oEoyPdh5N8RwR86Rqx-mpZrxewjuey6uXSfyvNY_CjEeXqUs-6KX6C1FuCmiEW4BisdIjAy9s78nY4znnS7hGbpmBtdN4fUvp-AFhT_lfhieMwCR5fFVPKG1xIR5C79OVdC31jM9YdRlaaJxBBWIf7OUwXgngTdwn94KMYIwSw2okKaASbk0K1KCbEe-O3961tBIUmkfYDleq3oHFiSoBOzOT3c5CnK5Kebp54C4lc80iY2Jvfbp4nB6_vFPUlsOsJlJKwQ0YTRFZs3lqAJQ48BswAoMyIR9LuTUib24-1efhE5ASWlSKi4ZSZXxNO3rlUp9-smk="
 )
 
 # Имя выходного файла
