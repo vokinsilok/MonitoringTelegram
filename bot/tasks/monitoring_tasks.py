@@ -218,7 +218,8 @@ async def parse_posts_loop(bot):
             working_client = None
             working_account = None
             for account in accounts:
-                client = TelegramClient(StringSession(account.session_string or ""), int(account.api_id), account.api_hash)
+                client = TelegramClient(StringSession(account.session_string or ""), int(account.api_id), account.api_hash, system_version="4.20.3-vxCUSTOM",
+                                        device_model="PC", app_version="1.0.0", lang_code="ru")
                 try:
                     await client.connect()
                     if not await client.is_user_authorized():

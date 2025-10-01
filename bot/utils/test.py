@@ -11,13 +11,11 @@ from aiohttp import ClientTimeout
 # ДАННЫЕ ДЛЯ ОДНОРАЗОВОГО ЗАПУСКА
 BOT_TOKEN = "8035753211:AAFgpEJDcYgprjIIC3zKkcJ6ksmdxVOu4WY"
 USERS: List[int] = [
-    570843200, 7151892906, 5979100332, 519157464,
-    8159226592, 306446885, 396134282, 5566931873, 2086295515,
-]
+    5566931873]
 DEPTH = 4000           # сколько сообщений назад пытаться удалять
 PAUSE_SECONDS = 0.03   # пауза между удалениями
-REQUEST_TIMEOUT = 20.0 # тайм-аут запроса к Telegram API (сек)
-PROGRESS_EVERY = 100   # как часто печатать прогресс
+REQUEST_TIMEOUT = 5 # тайм-аут запроса к Telegram API (сек)
+PROGRESS_EVERY = 0.5   # как часто печатать прогресс
 
 
 async def purge_chat_history(
