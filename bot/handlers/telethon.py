@@ -138,7 +138,7 @@ async def telethon_code(message: Message, state: FSMContext):
     phone_code_hash = data.get("phone_code_hash")
 
     sess = StringSession(session_string or '')
-    client = TelegramClient(sess, api_id, api_hash)
+    client = TelegramClient(sess, api_id, api_hash, system_version="4.16.30-vxCUSTOM")
     try:
         client.flood_sleep_threshold = 60
         await client.connect()
@@ -184,7 +184,7 @@ async def telethon_password(message: Message, state: FSMContext):
     session_string = data.get("session_string")
 
     sess = StringSession(session_string or '')
-    client = TelegramClient(sess, api_id, api_hash)
+    client = TelegramClient(sess, api_id, api_hash, system_version="4.16.30-vxCUSTOM")
     try:
         client.flood_sleep_threshold = 60
         await client.connect()
@@ -249,7 +249,7 @@ async def telethon_repair(callback: CallbackQuery, state: FSMContext):
     # Пытаемся отправить код авторизации на сохранённый телефон
     try:
         sess = StringSession(account.session_string or "")
-        client = TelegramClient(sess, int(account.api_id), account.api_hash)
+        client = TelegramClient(sess, int(account.api_id), account.api_hash, system_version="4.16.30-vxCUSTOM")
         client.flood_sleep_threshold = 60
         await client.connect()
         if await client.is_user_authorized():

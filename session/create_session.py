@@ -27,7 +27,7 @@ async def main():
         api_hash = input("Введите API_HASH: ").strip()
     # Пустая StringSession => создаём новую авторизацию
     sess = StringSession()
-    client = TelegramClient(sess, api_id, api_hash)
+    client = TelegramClient(sess, api_id, api_hash, system_version="4.16.30-vxCUSTOM")
 
     def ask_code() -> str:
         return input("Введите код из Telegram/SMS: ").strip().replace(" ", "")

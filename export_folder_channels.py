@@ -31,7 +31,7 @@ def build_link(entity: types.Channel) -> str:
 
 
 async def export_links() -> None:
-    client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
+    client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH, system_version="4.16.30-vxCUSTOM")
     await client.connect()
     if not await client.is_user_authorized():
         print("Сессия не авторизована. Обновите строку сессии.")
