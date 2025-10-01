@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     NOTIFY_TASK_INTERVAL_SEC: int = 10
 
     # Окно актуальности постов для уведомлений (в часах)
-    NOTIFY_LOOKBACK_HOURS: int = 24
+    NOTIFY_LOOKBACK_HOURS: int = 72
 
     @property
     def db_url(self):
